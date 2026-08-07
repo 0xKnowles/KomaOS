@@ -13,9 +13,11 @@
 #include <I18n.h>
 #include <Logging.h>
 #include <Memory.h>
+#include <Xtc/ReadingDirection.h>
 #include <Xtc/XthPixels.h>
 
 #include <algorithm>
+#include <utility>
 
 #include "KomaSettings.h"
 #include "KomaState.h"
@@ -35,6 +37,10 @@ void XtcReaderActivity::onEnter() {
   }
 
   xtc->setupCacheDir();
+
+  readingRightToLeft = xtc::isRightToLeft(SETTINGS.mangaReadingDirection, xtc->getReadDirection());
+  LOG_DBG("XTR", "Reading direction: %s (setting=%u, header=%u)", readingRightToLeft ? "RTL" : "LTR",
+          SETTINGS.mangaReadingDirection, xtc->getReadDirection());
 
   // Load saved progress
   loadProgress();
@@ -116,6 +122,15 @@ void XtcReaderActivity::loop() {
   nextTriggered = nextTriggered || touch.next;
   if (!prevTriggered && !nextTriggered) {
     return;
+  }
+
+  // Manga is read towards the spine, so "forward" is the control on the left.
+  // Swapping here rather than at each use keeps the swap in one place and means
+  // everything downstream -- skip-ahead, the end-of-book screen, progress --
+  // can keep reading "next" as "further into the book". Covers buttons, tilt
+  // and touch zones alike, since all three have already been folded in above.
+  if (readingRightToLeft) {
+    std::swap(prevTriggered, nextTriggered);
   }
 
   // At end of the book with no suggestion menu, forward button goes home and back

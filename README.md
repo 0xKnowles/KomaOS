@@ -40,6 +40,8 @@ CBZ and CBR are converted to XTC on a real computer, not on the device. Two ways
 
 - **Various formats**: native handling for `.epub`, `.xtc/.xtch`, `.txt`, and `.bmp`.
 
+- **Manga page direction**: right-to-left page turns for XTC/XTCH books, following the file's own reading-direction flag or forced either way (Settings → Reader → Manga Page Direction).
+
 - **Screenshots.**
 
 - **Custom fonts**: install your favorite fonts on the SD card.
@@ -71,7 +73,6 @@ See [ROADMAP.md](./ROADMAP.md) for the full list. The near-term work:
 - **Series shelf** — group volumes by series, resume at the right volume, roll over at the end of one.
 - **Panel/strip navigation** — treat the overlapping strips a volume was sliced into as first-class
   navigation instead of anonymous pages.
-- **Right-to-left page order** — the reading direction most manga is drawn for, per book.
 - **On-device CBZ** — read a stored (uncompressed) CBZ directly when no converted XTC exists.
 - **Two-page spread detection** — recognise a double-width page and lay it out as a spread.
 

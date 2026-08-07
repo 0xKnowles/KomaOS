@@ -43,6 +43,9 @@ class XtcParser {
   uint16_t getWidth() const { return m_defaultWidth; }
   uint16_t getHeight() const { return m_defaultHeight; }
   uint8_t getBitDepth() const { return m_bitDepth; }  // 1 = XTC/XTG, 2 = XTCH/XTH
+  // Raw readDirection byte from the header. Interpret with xtc::isRightToLeft
+  // (ReadingDirection.h) rather than comparing it here.
+  uint8_t getReadDirection() const { return m_header.readDirection; }
 
   // Page information
   bool getPageInfo(uint32_t pageIndex, PageInfo& info);

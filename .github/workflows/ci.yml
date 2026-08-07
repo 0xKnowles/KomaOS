@@ -2,8 +2,13 @@ name: CI (build)
 
 on:
   push:
-    branches: [master]
+    # KomaOS has no master branch yet; development happens on claude/** feature
+    # branches, and without them here nothing builds until a PR is opened.
+    branches: [master, main, 'claude/**']
   pull_request:
+  # Lets a build be kicked off by hand against any branch, which is how
+  # firmware.bin gets produced for a working branch without opening a PR.
+  workflow_dispatch:
 
 permissions:
   contents: read

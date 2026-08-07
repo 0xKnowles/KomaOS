@@ -73,6 +73,9 @@ class Xtc {
   uint16_t getPageWidth() const;
   uint16_t getPageHeight() const;
   uint8_t getBitDepth() const;  // 1 = XTC (1-bit), 2 = XTCH (2-bit)
+  // Raw readDirection byte from the file header. Interpret with
+  // xtc::isRightToLeft (Xtc/ReadingDirection.h); 0 when the file is not loaded.
+  uint8_t getReadDirection() const;
 
   /**
    * Load page bitmap data

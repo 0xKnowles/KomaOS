@@ -513,6 +513,13 @@ uint16_t Xtc::getPageHeight() const {
   return parser->getHeight();
 }
 
+uint8_t Xtc::getReadDirection() const {
+  if (!loaded || !parser) {
+    return 0;
+  }
+  return parser->getReadDirection();
+}
+
 uint8_t Xtc::getBitDepth() const {
   if (!loaded || !parser) {
     return 1;  // Default to 1-bit

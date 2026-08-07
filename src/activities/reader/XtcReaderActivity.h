@@ -20,6 +20,9 @@ class XtcReaderActivity final : public Activity {
 
   uint32_t currentPage = 0;
   int pagesUntilFullRefresh = 0;
+  // Resolved once in onEnter() from the setting and the file header, rather
+  // than per input event: neither input can change while the book is open.
+  bool readingRightToLeft = false;
   // Next-book suggestion menu for the End-of-Book screen
   EndOfBookOptions endOfBookOptions;
 

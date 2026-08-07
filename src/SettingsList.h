@@ -256,6 +256,9 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                            StrId::STR_BOOK_S_STYLE},
                           "paragraphAlignment", StrId::STR_CAT_READER)
             .withTextSettings(),
+        SettingInfo::Enum(StrId::STR_MANGA_READING_DIRECTION, &KomaSettings::mangaReadingDirection,
+                          {StrId::STR_MANGA_DIR_AUTO, StrId::STR_MANGA_DIR_LTR, StrId::STR_MANGA_DIR_RTL},
+                          "mangaReadingDirection", StrId::STR_CAT_READER),
         SettingInfo::Toggle(StrId::STR_EMBEDDED_STYLE, &KomaSettings::embeddedStyle, "embeddedStyle",
                             StrId::STR_CAT_READER)
             .withTextSettings(),

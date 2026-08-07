@@ -44,6 +44,15 @@ class KomaSettings : public PersistableStore<KomaSettings> {
     STATUS_BAR_PROGRESS_BAR_THICKNESS_COUNT
   };
   enum STATUS_BAR_TITLE { BOOK_TITLE = 0, CHAPTER_TITLE = 1, HIDE_TITLE = 2, STATUS_BAR_TITLE_COUNT };
+  // Page-turn direction for XTC/XTCH (manga) books. Mirrors xtc::DirectionPreference
+  // in lib/Xtc/Xtc/ReadingDirection.h -- keep the two in step, and do not
+  // renumber: these values are persisted in settings.json.
+  enum MANGA_READING_DIRECTION {
+    MANGA_DIR_AUTO = 0,  // follow the file's own readDirection byte
+    MANGA_DIR_LTR = 1,
+    MANGA_DIR_RTL = 2,
+    MANGA_READING_DIRECTION_COUNT
+  };
   enum XTC_STATUS_BAR_MODE {
     XTC_STATUS_BAR_HIDE = 0,
     XTC_STATUS_BAR_BOTTOM = 1,
@@ -185,6 +194,9 @@ class KomaSettings : public PersistableStore<KomaSettings> {
   uint8_t statusBarTitle = CHAPTER_TITLE;
   uint8_t statusBarBattery = 1;
   uint8_t xtcStatusBarMode = XTC_STATUS_BAR_HIDE;
+  // Manga page-turn direction. AUTO resolves to left-to-right for every file
+  // written by a current encoder, so this defaults to no behaviour change.
+  uint8_t mangaReadingDirection = MANGA_DIR_AUTO;
   // Clock display in status bar (X3 only, requires DS3231 RTC)
   uint8_t statusBarClock = STATUS_BAR_CLOCK_HIDE;
   // Clock UTC offset in quarter-hour steps, biased by 48 so it fits in uint8_t.

@@ -21,8 +21,9 @@ conversion belongs in [FlipNzb](https://github.com/0xKnowles/FlipNzb) or
 
 ### M1 - Reading a volume
 
-* **Right-to-left page order**, per book, persisted with progress. The single highest-value change: most
-  manga is drawn for it, and it is a page-index transform plus a settings flag, not a rendering change.
+* ~~**Right-to-left page order.**~~ **Landed.** Settings → Reader → Manga Page Direction, with Auto
+  following the XTC header's `readDirection` byte. Auto resolves to left-to-right for every file
+  current encoders produce, so the default changes nothing until a converter starts populating it.
 * **Strip-aware navigation.** A page in a converted volume is one of N overlapping strips of a source page.
   Surface that: jump by source page, not just by strip.
 * **Two-page spread detection** from the XTC index (a page roughly twice the usual width is a spread) and
