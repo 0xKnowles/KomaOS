@@ -46,6 +46,8 @@ class XtcParser {
   // Raw readDirection byte from the header. Interpret with xtc::isRightToLeft
   // (ReadingDirection.h) rather than comparing it here.
   uint8_t getReadDirection() const { return m_header.readDirection; }
+  /** Split geometry recorded by the encoder; invalid for files written before it was. */
+  XtcSplitGeometry getSplitGeometry() const { return decodeSplitGeometry(m_header.splitGeometry); }
 
   // Page information
   bool getPageInfo(uint32_t pageIndex, PageInfo& info);

@@ -536,8 +536,17 @@ bool XtcReaderActivity::fullViewActive() const {
   // Full view only means anything for a volume that was actually split. A
   // nosplit encode is one strip per page, and reassembling three of those would
   // stack three unrelated pages.
-  return SETTINGS.mangaViewMode == KomaSettings::MANGA_VIEW_MODE::MANGA_VIEW_FULL &&
-         xtc->getPageCount() >= FullPageLayout::STRIPS_PER_PAGE;
+  if (SETTINGS.mangaViewMode != KomaSettings::MANGA_VIEW_MODE::MANGA_VIEW_FULL) return false;
+  // A nosplit encode is one page per strip; stacking three would splice
+  // unrelated pages together.
+  if (xtc->getPageCount() < FullPageLayout::STRIPS_PER_PAGE) return false;
+
+  // When the file says how many strips a page takes, believe it rather than
+  // assuming three. overlapSegments emits more for an unusually tall page, and
+  // reassembling those three at a time would cut pages in the wrong places.
+  const xtc::XtcSplitGeometry geometry = xtc->getSplitGeometry();
+  if (geometry.valid && geometry.stripsPerPage != FullPageLayout::STRIPS_PER_PAGE) return false;
+  return true;
 }
 
 uint32_t XtcReaderActivity::pageStep() const { return fullViewActive() ? FullPageLayout::STRIPS_PER_PAGE : 1; }
@@ -552,9 +561,14 @@ bool XtcReaderActivity::renderFullPage() {
   const uint16_t stripHeight = xtc->getPageHeight();
   const uint8_t bitDepth = xtc->getBitDepth();
 
-  const FullPageLayout::Layout layout =
-      FullPageLayout::plan(stripWidth, stripHeight, renderer.getScreenWidth(), renderer.getScreenHeight(),
-                           SETTINGS.getMangaFullOverlapPercent());
+  // Prefer the encoder's own figure over the user's setting. The setting exists
+  // because the overlap follows from the original page's aspect ratio, which
+  // conversion consumes -- once a file records it, guessing is strictly worse.
+  const xtc::XtcSplitGeometry geometry = xtc->getSplitGeometry();
+  const int overlapPercent = geometry.valid ? geometry.overlapPercent() : SETTINGS.getMangaFullOverlapPercent();
+
+  const FullPageLayout::Layout layout = FullPageLayout::plan(stripWidth, stripHeight, renderer.getScreenWidth(),
+                                                             renderer.getScreenHeight(), overlapPercent);
   if (!layout.valid) {
     LOG_ERR("XTR", "Full view layout failed for %ux%u strip", stripWidth, stripHeight);
     return false;
@@ -593,6 +607,13 @@ bool XtcReaderActivity::renderFullPage() {
     }
 
     // Ink level 0..3 at a stored strip pixel, whatever the bit depth.
+    // The file's rotationQuarterTurns is deliberately NOT wired in here yet.
+    // It says the encoder applied one clockwise quarter turn, which predicts
+    // mirroring stored X alone -- but on hardware the page came out a full 180
+    // out, so something downstream adds a second flip that is not yet found.
+    // Mirroring both axes is what actually renders right, so that stays until
+    // the discrepancy is explained on a device rather than on paper.
+    //
     // The strip's quarter turn runs the opposite way to the obvious reading of
     // it: page rows count DOWN stored X and page columns count DOWN stored Y.
     // Sampling it the other way put the page 180 degrees out AND cropped the

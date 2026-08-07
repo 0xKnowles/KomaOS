@@ -35,6 +35,42 @@ constexpr uint64_t XTC_LEGACY_HEADER_SIZE = 0x30;  // Original header before cha
 
 // XTC file header (56 bytes; legacy files may start the page table at 48 bytes)
 #pragma pack(push, 1)
+/**
+ * How a source page was cut into the strips a file stores.
+ *
+ * Written by FlipNzb into the header qword at 0x28 (see its xtc.ts). That qword
+ * used to be mapped here as a thumbnail offset, alongside a "has thumbnails"
+ * byte -- neither was ever written by an encoder or read by this firmware, so
+ * the field has been claimed rather than left ambiguous. Anything that revives
+ * thumbnails needs a different home.
+ *
+ * Without this, a reader reassembling a full page has to guess the overlap and
+ * the rotation, and both guesses are wrong in ways that look like a bad scan.
+ * A file written before the encoder recorded it decodes to `valid == false`,
+ * and the caller falls back to the user's overlap setting.
+ */
+struct XtcSplitGeometry {
+  uint8_t mode;                  // index into the encoder's mode table; 0 = not recorded
+  uint8_t stripsPerPage;         // 1 for an unsplit page
+  uint16_t overlapPerMille;      // overlap between strips, per-mille of one strip
+  uint8_t rotationQuarterTurns;  // quarter turns clockwise applied when storing a strip
+  bool valid;
+
+  int overlapPercent() const { return (overlapPerMille + 5) / 10; }
+};
+
+/** Unpacks the 0x28 qword. Zero -- every pre-existing file -- yields valid=false. */
+inline XtcSplitGeometry decodeSplitGeometry(const uint64_t packed) {
+  XtcSplitGeometry g{};
+  g.mode = static_cast<uint8_t>(packed & 0xFF);
+  if (g.mode == 0) return g;  // valid stays false
+  g.stripsPerPage = static_cast<uint8_t>((packed >> 8) & 0xFF);
+  g.overlapPerMille = static_cast<uint16_t>((packed >> 16) & 0xFFFF);
+  g.rotationQuarterTurns = static_cast<uint8_t>((packed >> 32) & 0x03);
+  g.valid = g.stripsPerPage > 0;
+  return g;
+}
+
 struct XtcHeader {
   uint32_t magic;            // 0x00: Magic number "XTC\0" (0x00435458)
   uint8_t versionMajor;      // 0x04: Format version major (typically 1) (together with minor = 1.0)
@@ -42,13 +78,13 @@ struct XtcHeader {
   uint16_t pageCount;        // 0x06: Total page count
   uint8_t readDirection;     // 0x08: Reading direction (0-2)
   uint8_t hasMetadata;       // 0x09: Has metadata (0-1)
-  uint8_t hasThumbnails;     // 0x0A: Has thumbnails (0-1)
+  uint8_t reserved0A;        // 0x0A: was "has thumbnails"; never written or read
   uint8_t hasChapters;       // 0x0B: Has chapters (0-1)
   uint32_t currentPage;      // 0x0C: Current page (1-based) (0-65535)
   uint64_t metadataOffset;   // 0x10: Metadata offset (0 if unused)
   uint64_t pageTableOffset;  // 0x18: Page table offset
   uint64_t dataOffset;       // 0x20: First page data offset
-  uint64_t thumbOffset;      // 0x28: Thumbnail offset
+  uint64_t splitGeometry;    // 0x28: packed SplitGeometry (0 when the encoder did not record it)
   uint32_t chapterOffset;    // 0x30: Chapter data offset
   uint32_t padding;          // 0x34: Padding to 56 bytes
 };

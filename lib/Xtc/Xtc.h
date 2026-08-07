@@ -76,6 +76,9 @@ class Xtc {
   // Raw readDirection byte from the file header. Interpret with
   // xtc::isRightToLeft (Xtc/ReadingDirection.h); 0 when the file is not loaded.
   uint8_t getReadDirection() const;
+  // Split geometry from the file header. Invalid for a volume encoded before
+  // the converter recorded it, which is every volume already on a card.
+  xtc::XtcSplitGeometry getSplitGeometry() const;
 
   /**
    * Load page bitmap data
