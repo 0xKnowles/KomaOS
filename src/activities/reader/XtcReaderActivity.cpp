@@ -22,7 +22,6 @@
 #include "KomaSettings.h"
 #include "KomaState.h"
 #include "MappedInputManager.h"
-#include "ProgressFile.h"
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
 #include "XtcReaderBookmarksActivity.h"
@@ -34,6 +33,7 @@
 #include "fontIds.h"
 #include "util/ScreenshotUtil.h"
 #include "util/XtcBookmarks.h"
+#include "util/XtcProgress.h"
 
 void XtcReaderActivity::onEnter() {
   Activity::onEnter();
@@ -534,30 +534,27 @@ void XtcReaderActivity::renderPage() {
 }
 
 void XtcReaderActivity::saveProgress() const {
-  uint8_t data[4];
-  data[0] = currentPage & 0xFF;
-  data[1] = (currentPage >> 8) & 0xFF;
-  data[2] = (currentPage >> 16) & 0xFF;
-  data[3] = (currentPage >> 24) & 0xFF;
-  if (!ProgressFile::writeAtomic(xtc->getCachePath(), data, sizeof(data))) {
+  // The page count rides along so the home screen can show progress for a
+  // volume it is not reading, without opening the XTC to find out how long it
+  // is. See XtcProgress.h.
+  if (!XtcProgress::write(xtc->getCachePath(), currentPage, xtc->getPageCount())) {
     LOG_ERR("XTR", "Failed to save progress: page %lu", currentPage);
   }
 }
 
 void XtcReaderActivity::loadProgress() {
-  HalFile f;
-  if (Storage.openFileForRead("XTR", xtc->getCachePath() + "/progress.bin", f)) {
-    uint8_t data[4];
-    if (f.read(data, 4) == 4) {
-      currentPage = data[0] | (data[1] << 8) | (data[2] << 16) | (data[3] << 24);
-      LOG_DBG("XTR", "Loaded progress: page %lu", currentPage);
+  const XtcProgress::Snapshot saved = XtcProgress::read(xtc->getCachePath());
+  if (!saved.valid) {
+    return;
+  }
 
-      // Validate page number
-      if (currentPage >= xtc->getPageCount()) {
-        currentPage = 0;
-      }
-    }
-    f.close();
+  currentPage = saved.page;
+  LOG_DBG("XTR", "Loaded progress: page %lu", currentPage);
+
+  // Validate against this file, not the stored count: the volume may have been
+  // re-encoded shorter since it was last read.
+  if (currentPage >= xtc->getPageCount()) {
+    currentPage = 0;
   }
 }
 
