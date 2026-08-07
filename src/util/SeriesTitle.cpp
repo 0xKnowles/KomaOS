@@ -1,5 +1,6 @@
 #include "SeriesTitle.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 
@@ -26,10 +27,9 @@ std::string_view stripExtension(std::string_view name) {
   if (ext.size() < 2 || ext.size() > 4) {
     return name;
   }
-  for (const char c : ext) {
-    if (!std::isalpha(static_cast<unsigned char>(c))) {
-      return name;
-    }
+  if (!std::all_of(ext.begin(), ext.end(),
+                   [](const char c) { return std::isalpha(static_cast<unsigned char>(c)) != 0; })) {
+    return name;
   }
   return name.substr(0, dot);
 }
@@ -67,17 +67,15 @@ bool readNumber(std::string_view s, size_t pos, int& valueOut, size_t& digitsOut
   return true;
 }
 
+/** Case-insensitive equality of two ranges. */
+bool equalsIgnoreCase(std::string_view a, std::string_view b) {
+  return a.size() == b.size() &&
+         std::equal(a.begin(), a.end(), b.begin(), [](const char x, const char y) { return lower(x) == lower(y); });
+}
+
 /** Matches `prefix` case-insensitively at `pos`. */
-bool matchesAt(std::string_view s, size_t pos, std::string_view prefix) {
-  if (pos + prefix.size() > s.size()) {
-    return false;
-  }
-  for (size_t i = 0; i < prefix.size(); i++) {
-    if (lower(s[pos + i]) != lower(prefix[i])) {
-      return false;
-    }
-  }
-  return true;
+bool matchesAt(std::string_view s, const size_t pos, std::string_view prefix) {
+  return pos + prefix.size() <= s.size() && equalsIgnoreCase(s.substr(pos, prefix.size()), prefix);
 }
 
 /**
@@ -87,12 +85,11 @@ bool matchesAt(std::string_view s, size_t pos, std::string_view prefix) {
  * first three characters of "volume" and leave "ume" where a number should be.
  */
 size_t volumeKeywordLength(std::string_view s, const size_t pos) {
-  for (const std::string_view keyword : {std::string_view("volume"), std::string_view("vol"), std::string_view("v")}) {
-    if (matchesAt(s, pos, keyword)) {
-      return keyword.size();
-    }
-  }
-  return 0;
+  // constexpr so the table stays in flash rather than being rebuilt per call.
+  static constexpr std::string_view KEYWORDS[] = {"volume", "vol", "v"};
+  const auto* match = std::find_if(std::begin(KEYWORDS), std::end(KEYWORDS),
+                                   [&](const std::string_view keyword) { return matchesAt(s, pos, keyword); });
+  return match != std::end(KEYWORDS) ? match->size() : 0;
 }
 
 /** True when `pos` starts a token, i.e. it is the start or follows a separator. */
@@ -188,15 +185,7 @@ std::string badge(const int volume) {
 bool sameSeries(std::string_view a, std::string_view b) {
   const Parsed pa = parse(a);
   const Parsed pb = parse(b);
-  if (pa.series.empty() || pb.series.empty() || pa.series.size() != pb.series.size()) {
-    return false;
-  }
-  for (size_t i = 0; i < pa.series.size(); i++) {
-    if (lower(pa.series[i]) != lower(pb.series[i])) {
-      return false;
-    }
-  }
-  return true;
+  return !pa.series.empty() && !pb.series.empty() && equalsIgnoreCase(pa.series, pb.series);
 }
 
 }  // namespace SeriesTitle
