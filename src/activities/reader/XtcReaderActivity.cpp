@@ -382,7 +382,16 @@ void XtcReaderActivity::renderStatusBarOverlay(const StatusBarOverlayPosition po
   const int displayPage = static_cast<int>(currentPage) + 1;
   const float progress = pageCount > 0 ? (static_cast<float>(displayPage) * 100.0f) / pageCount : 0.0f;
   const auto pageInfo = getStatusBarInfo();
-  GUI.drawStatusBar(renderer, progress, pageInfo.currentPage, pageInfo.pageCount, pageInfo.title, paddingBottom);
+  // Bottom turns its glyphs a quarter turn; Top does not. FlipNzb's split modes
+  // store each strip already rotated (comic.ts, Region::rotate) so it fills the
+  // panel when the device is turned, but the bar is drawn by the firmware in
+  // unrotated panel space -- which is why the artwork reads upright and the
+  // status text reads sideways. Turning the glyphs squares the two up without
+  // moving the bar. Top is left upright so an unrotated volume still has a mode
+  // that reads correctly.
+  const bool turnGlyphs = sb.xtcMode == KomaSettings::XTC_STATUS_BAR_MODE::XTC_STATUS_BAR_BOTTOM;
+  GUI.drawStatusBar(renderer, progress, pageInfo.currentPage, pageInfo.pageCount, pageInfo.title, paddingBottom, 0,
+                    true, false, false, turnGlyphs);
 }
 
 void XtcReaderActivity::renderSideStatusBar() const {

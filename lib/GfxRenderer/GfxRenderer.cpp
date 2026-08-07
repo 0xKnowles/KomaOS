@@ -2044,6 +2044,60 @@ void GfxRenderer::drawTextRotated90CW(const int fontId, const int x, const int y
   }
 }
 
+int GfxRenderer::getTurnedTextExtent(const int fontId, const char* text) const {
+  if (text == nullptr || *text == '\0') {
+    return 0;
+  }
+  // Resolved before the walk below: utf8NextCodepoint advances `text`, so
+  // resolving afterwards would hand resolveTextFontId the empty string and miss
+  // the CJK fallback that decides the line height.
+  const int resolvedFontId = resolveTextFontId(fontId, text, EpdFontFamily::REGULAR);
+
+  int cells = 0;
+  uint32_t cp;
+  while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text)))) {
+    if (utf8IsCombiningMark(cp) || BidiUtils::isTransparentMark(cp)) continue;
+    cells++;
+  }
+  return cells * getLineHeight(resolvedFontId);
+}
+
+void GfxRenderer::drawTextGlyphsTurned(const int fontId, const int x, const int y, const char* text, const bool black,
+                                       const EpdFontFamily::Style style) const {
+  if (text == nullptr || *text == '\0') {
+    return;
+  }
+
+  const int resolvedFontId = resolveTextFontId(fontId, text, style);
+  const auto fontIt = fontMap.find(resolvedFontId);
+  if (fontIt == fontMap.end()) {
+    LOG_ERR("GFX", "Font %d not found", resolvedFontId);
+    return;
+  }
+  const auto& font = fontIt->second;
+
+  // One fixed cell per character rather than each glyph's own advance. The
+  // advance is a horizontal measurement of an upright glyph; once the glyph is
+  // turned it no longer describes the direction the run travels in, so packing
+  // by it would overlap narrow glyphs and gap wide ones. A constant cell is
+  // also what vertical text conventionally uses.
+  const int cell = getLineHeight(resolvedFontId);
+  int cellX = x;
+
+  uint32_t cp;
+  while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text)))) {
+    // Combining marks need the anchor maths drawTextRotated90CW carries for a
+    // rotated run; skipped here rather than dropped in the wrong place. Status
+    // text is digits and Latin, where they do not arise.
+    if (utf8IsCombiningMark(cp) || BidiUtils::isTransparentMark(cp)) continue;
+
+    // Same per-glyph mapping the side-button hints use -- only the cursor
+    // differs, advancing along x here instead of up the panel.
+    renderCharImpl<TextRotation::Rotated90CW>(*this, renderMode, font, cp, cellX, y, black, style);
+    cellX += cell;
+  }
+}
+
 uint8_t* GfxRenderer::getFrameBuffer() const { return frameBuffer; }
 
 size_t GfxRenderer::getBufferSize() const { return frameBufferSize; }

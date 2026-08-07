@@ -781,8 +781,22 @@ void BaseTheme::fillPopupProgress(const GfxRenderer& renderer, const Rect& layou
 
 void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, const int currentPage,
                               const int pageCount, std::string title, const int paddingBottom, const int textYOffset,
-                              const bool fillMargin, const bool isPageBookmarked, const bool pageCountEstimated) const {
+                              const bool fillMargin, const bool isPageBookmarked, const bool pageCountEstimated,
+                              const bool turnGlyphs) const {
   auto metrics = UITheme::getInstance().getMetrics();
+  // With turnGlyphs the letters are a quarter turn over but the bar keeps its
+  // place and shape, so every measurement below stays in panel space -- only
+  // the glyph draw and the width a string occupies change.
+  const auto drawStatusText = [&renderer, turnGlyphs](const int x, const int y, const char* text) {
+    if (turnGlyphs) {
+      renderer.drawTextGlyphsTurned(SMALL_FONT_ID, x, y, text);
+    } else {
+      renderer.drawText(SMALL_FONT_ID, x, y, text);
+    }
+  };
+  const auto statusTextWidth = [&renderer, turnGlyphs](const char* text) {
+    return turnGlyphs ? renderer.getTurnedTextExtent(SMALL_FONT_ID, text) : renderer.getTextWidth(SMALL_FONT_ID, text);
+  };
   int orientedMarginTop, orientedMarginRight, orientedMarginBottom, orientedMarginLeft;
   renderer.getOrientedViewableTRBL(&orientedMarginTop, &orientedMarginRight, &orientedMarginBottom,
                                    &orientedMarginLeft);
@@ -814,8 +828,8 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
       snprintf(progressStr, sizeof(progressStr), "%s%d/%d", estimatePrefix, currentPage, pageCount);
     }
 
-    int progressTextWidth = renderer.getTextWidth(SMALL_FONT_ID, progressStr);
-    renderer.drawText(SMALL_FONT_ID, rightClusterX - progressTextWidth, textY, progressStr);
+    int progressTextWidth = statusTextWidth(progressStr);
+    drawStatusText(rightClusterX - progressTextWidth, textY, progressStr);
 
     rightClusterWidth += progressTextWidth;
   }
@@ -862,7 +876,7 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
   if (sb.showsClock() && halClock.isAvailable()) {
     char timeBuf[9];
     if (halClock.formatTime(timeBuf, sizeof(timeBuf), sb.clockUtcOffsetQ, sb.clock12h)) {
-      int clockTextWidth = renderer.getTextWidth(SMALL_FONT_ID, timeBuf);
+      int clockTextWidth = statusTextWidth(timeBuf);
       int clockX = 0;
       // Position to the left or right of the progress text (with a small gap)
       if (sb.clockMode == KomaSettings::STATUS_BAR_CLOCK_LEFT) {
@@ -872,7 +886,7 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
         clockX = rightClusterX - rightClusterWidth - (rightClusterWidth > 0 ? 10 : 0) - clockTextWidth;
         rightClusterWidth += clockTextWidth + 10;
       }
-      renderer.drawText(SMALL_FONT_ID, clockX, textY, timeBuf);
+      drawStatusText(clockX, textY, timeBuf);
     }
   }
 
@@ -902,7 +916,7 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
     int availableTitleSpace = rendererableScreenWidth - 2 * titleMarginLeftAdjusted;
 
     int titleWidth;
-    titleWidth = renderer.getTextWidth(SMALL_FONT_ID, title.c_str());
+    titleWidth = statusTextWidth(title.c_str());
     if (titleWidth > availableTitleSpace) {
       // Not enough space to center on the screen, center it within the remaining space instead
       availableTitleSpace = rendererableScreenWidth - titleMarginLeft - titleMarginRight;
@@ -910,13 +924,12 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
     }
     if (titleWidth > availableTitleSpace) {
       title = renderer.truncatedText(SMALL_FONT_ID, title.c_str(), availableTitleSpace);
-      titleWidth = renderer.getTextWidth(SMALL_FONT_ID, title.c_str());
+      titleWidth = statusTextWidth(title.c_str());
     }
 
-    renderer.drawText(SMALL_FONT_ID,
-                      titleMarginLeftAdjusted + metrics.statusBarHorizontalMargin + orientedMarginLeft +
-                          (availableTitleSpace - titleWidth) / 2,
-                      textY, title.c_str());
+    drawStatusText(titleMarginLeftAdjusted + metrics.statusBarHorizontalMargin + orientedMarginLeft +
+                       (availableTitleSpace - titleWidth) / 2,
+                   textY, title.c_str());
   }
 }
 

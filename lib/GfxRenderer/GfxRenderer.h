@@ -271,6 +271,24 @@ class GfxRenderer {
   // Helper for drawing rotated text (90 degrees clockwise, for side buttons)
   void drawTextRotated90CW(int fontId, int x, int y, const char* text, bool black = true,
                            EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
+  /**
+   * Turns each glyph a quarter turn but keeps the run travelling along +x.
+   *
+   * Distinct from drawTextRotated90CW, which rotates the whole block -- glyphs
+   * and run together -- into a vertical line. This turns the letters only, so
+   * the text still occupies a horizontal strip on the panel and only becomes a
+   * vertical line of upright letters once the device itself is turned. That is
+   * what a status bar under pre-rotated manga artwork needs: the artwork is
+   * already stored a quarter turn over, so the bar has to match it without
+   * leaving the strip it lives in.
+   *
+   * `y` anchors the far edge of the glyphs, not their baseline: they extend
+   * back from it, the same direction drawTextRotated90CW's do.
+   */
+  void drawTextGlyphsTurned(int fontId, int x, int y, const char* text, bool black = true,
+                            EpdFontFamily::Style style = EpdFontFamily::REGULAR) const;
+  /** Extent along x of drawTextGlyphsTurned's run: one line height per character. */
+  int getTurnedTextExtent(int fontId, const char* text) const;
   int getTextHeight(int fontId) const;
 
   // Grayscale functions
