@@ -2,7 +2,13 @@
 PlatformIO pre-build script: inject git branch and short SHA into
 KOMAOS_VERSION for the default (dev) environment.
 
-Results in a version string like:  1.1.0-dev-feat-kosync-xpath-05c6cf8
+Results in a version string like:  1.1.0-dev-05c6cf8
+
+The branch name is deliberately NOT in the compiled string: it is drawn on the
+boot and sleep screens, where a long working-branch name is noise and leaks the
+branch to anyone holding the device. The short SHA identifies the build exactly,
+which is what the version is for. The branch is still printed to the build log
+below for local debugging.
 Release environments are unaffected; they set KOMAOS_VERSION in the ini.
 """
 
@@ -86,10 +92,10 @@ def inject_version(env):
     base_version = get_base_version(project_dir)
     branch = get_git_branch(project_dir)
     short_sha = get_git_short_sha(project_dir)
-    version_string = f'{base_version}-dev-{branch}-{short_sha}'
+    version_string = f'{base_version}-dev-{short_sha}'
 
     env.Append(CPPDEFINES=[('KOMAOS_VERSION', f'\\"{version_string}\\"')])
-    print(f'KomaOS build version: {version_string}')
+    print(f'KomaOS build version: {version_string} (branch: {branch})')
 
 
 # PlatformIO/SCons entry point — Import and env are SCons builtins injected at runtime.

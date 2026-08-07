@@ -29,9 +29,13 @@ namespace ProgressFile {
 // fail at the FAT level, in which case recovery still requires fsck on a host.
 //
 // Returns true only if the new progress.bin is fully in place.
-inline bool writeAtomic(const std::string& cachePath, const uint8_t* data, size_t len) {
-  const std::string finalPath = cachePath + "/progress.bin";
-  const std::string tmpPath = cachePath + "/progress.bin.tmp";
+//
+// The named overload applies the same guarantee to any file in a book's cache
+// directory; bookmarks.bin uses it, because a torn write there loses every
+// bookmark in the book rather than one page number.
+inline bool writeAtomicNamed(const std::string& cachePath, const char* fileName, const uint8_t* data, size_t len) {
+  const std::string finalPath = cachePath + "/" + fileName;
+  const std::string tmpPath = finalPath + ".tmp";
 
   {
     HalFile f;
@@ -59,6 +63,10 @@ inline bool writeAtomic(const std::string& cachePath, const uint8_t* data, size_
     return false;
   }
   return true;
+}
+
+inline bool writeAtomic(const std::string& cachePath, const uint8_t* data, size_t len) {
+  return writeAtomicNamed(cachePath, "progress.bin", data, len);
 }
 
 }  // namespace ProgressFile
