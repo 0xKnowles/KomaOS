@@ -68,4 +68,11 @@ class CollectionTheme : public LyraTheme {
   void drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
                            const int selectorIndex, bool& coverRendered, bool& coverBufferStored, bool& bufferRestored,
                            std::function<bool()> storeCoverBuffer) const override;
+  // Lyra's menu is five rows of icon-and-label with a light fill on the
+  // selected one and nothing else, which reads as very flat under a shelf of
+  // cover art. This delegates to Lyra for the icons and labels -- the icon
+  // lookup is file-local to LyraTheme.cpp -- then overlays the styling.
+  void drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
+                      const std::function<std::string(int index)>& buttonLabel,
+                      const std::function<UIIcon(int index)>& rowIcon) const override;
 };

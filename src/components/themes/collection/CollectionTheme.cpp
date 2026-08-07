@@ -95,6 +95,11 @@ void drawShelf(const GfxRenderer& renderer, const Rect& rect, const int row) {
   renderer.fillRectDither(rect.x, shelfY + SHELF_THICKNESS, rect.width, 2, Color::LightGray);
 }
 
+/** Accent tab marking the selected menu row. */
+constexpr int MENU_ACCENT_WIDTH = 4;
+/** Inset so the tab floats inside the row's rounded fill instead of fighting its corners. */
+constexpr int MENU_ACCENT_INSET = 6;
+
 /** Bracket around the selected cover: drawn outside it so no art is hidden. */
 void drawSelection(const GfxRenderer& renderer, const CellGeometry& cell) {
   for (int i = 1; i <= SELECTION_BORDER; i++) {
@@ -142,5 +147,47 @@ void CollectionTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, cons
     renderer.fillRect(rect.x, titleY, rect.width, TITLE_STRIP_HEIGHT, false);
     UITheme::drawCenteredText(renderer, rect, SMALL_FONT_ID, titleY, recentBooks[selectorIndex].title.c_str(), true,
                               EpdFontFamily::BOLD);
+  }
+}
+
+void CollectionTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
+                                     const std::function<std::string(int index)>& buttonLabel,
+                                     const std::function<UIIcon(int index)>& rowIcon) const {
+  // Icons and labels first: iconForName lives in LyraTheme.cpp's anonymous
+  // namespace, so delegating is the only way to reuse the lookup rather than
+  // duplicating the whole icon table here.
+  LyraTheme::drawButtonMenu(renderer, rect, buttonCount, selectedIndex, buttonLabel, rowIcon);
+
+  const int pad = LyraMetrics::values.contentSidePadding;
+  const int rowHeight = LyraMetrics::values.menuRowHeight;
+  const int step = rowHeight + LyraMetrics::values.menuSpacing;
+  const int left = rect.x + pad;
+  const int right = rect.x + rect.width - pad;
+
+  for (int i = 0; i < buttonCount; i++) {
+    const int rowY = rect.y + i * step;
+
+    if (i == selectedIndex) {
+      // A solid tab down the left edge. Reads at a glance against the light
+      // fill Lyra already drew, and unlike inverting the row it does not need
+      // white text or a white icon -- drawIcon only ever draws ink.
+      renderer.fillRect(left + 2, rowY + MENU_ACCENT_INSET, MENU_ACCENT_WIDTH, rowHeight - 2 * MENU_ACCENT_INSET, true);
+
+      // Chevron on the right, so the selected row reads as "this one opens".
+      const int chevronX = right - 20;
+      const int chevronY = rowY + rowHeight / 2;
+      renderer.drawLine(chevronX, chevronY - 7, chevronX + 7, chevronY, 2, true);
+      renderer.drawLine(chevronX + 7, chevronY, chevronX, chevronY + 7, 2, true);
+    } else if (i + 1 < buttonCount && i + 1 != selectedIndex) {
+      // Hairline between two unselected rows so the block reads as a list
+      // rather than floating text. Skipped next to the selected row, where the
+      // fill already provides the separation.
+      // DarkGray, not LightGray: LightGray inks only x%2==0 && y%2==0, so a
+      // one-pixel line of it is every fourth pixel and effectively invisible.
+      // DarkGray's (x+y)%2 checker gives a proper dotted hairline.
+      const int separatorY = rowY + rowHeight + LyraMetrics::values.menuSpacing / 2;
+      renderer.fillRectDither(left + MENU_ACCENT_INSET, separatorY, right - left - 2 * MENU_ACCENT_INSET, 1,
+                              Color::DarkGray);
+    }
   }
 }
