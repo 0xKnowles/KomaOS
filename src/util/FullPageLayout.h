@@ -53,6 +53,13 @@ constexpr int DEFAULT_OVERLAP_PERCENT = 27;
  * strip's stored width spans the page rows it covers and its stored height
  * spans the page's full width. Stacking strips along stored Y would assemble
  * the page sideways, which is exactly the bug the 0.6 scale test catches.
+ *
+ * The axis is also REVERSED: page row 0 sits at the highest stored X, not the
+ * lowest, and page column 0 at the highest stored Y. That is the renderer's
+ * business, not this file's -- the counts here are page-direction offsets and
+ * the caller mirrors them onto the strip. It matters because it decides which
+ * end of a strip the duplicated lead is at: cutting the wrong end leaves the
+ * overlap in and drops unique art, on top of the page coming out upside down.
  */
 struct StripPlacement {
   /** First column of the strip to read (page direction). */

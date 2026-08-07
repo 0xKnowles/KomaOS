@@ -593,6 +593,14 @@ bool XtcReaderActivity::renderFullPage() {
     }
 
     // Ink level 0..3 at a stored strip pixel, whatever the bit depth.
+    // The strip's quarter turn runs the opposite way to the obvious reading of
+    // it: page rows count DOWN stored X and page columns count DOWN stored Y.
+    // Sampling it the other way put the page 180 degrees out AND cropped the
+    // wrong end of each strip -- the duplicated lead sits at high X, so cutting
+    // low X left the overlap in and dropped unique art instead.
+    const auto mirrorX = [stripWidth](const int x) { return stripWidth - 1 - std::clamp(x, 0, stripWidth - 1); };
+    const auto mirrorY = [stripHeight](const int y) { return stripHeight - 1 - std::clamp(y, 0, stripHeight - 1); };
+
     const auto levelAt = [&](const int sx, const int sy) -> int {
       if (bitDepth == 2) {
         return xth.levelInColumn(xth.columnBase(static_cast<uint16_t>(sx)), static_cast<uint16_t>(sy));
@@ -625,7 +633,7 @@ bool XtcReaderActivity::renderFullPage() {
           for (int oy = 0; oy < colsPerDest; oy++) {
             const int sy = srcY + oy;
             if (sy >= stripHeight) break;
-            total += levelAt(sx, sy);
+            total += levelAt(mirrorX(sx), mirrorY(sy));
             samples++;
           }
         }
