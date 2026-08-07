@@ -11,8 +11,6 @@ comic pipeline that starts at a CBZ on your NAS and ends at a page on the panel.
 
 **Now running on:** ESP32C3-based Xteink [X4](https://www.xteink.com/products/xteink-x4) and [X3](https://www.xteink.com/products/xteink-x3).
 
-![KomaOS running on Xteink device](./docs/images/cover.jpg)
-
 ## Relationship to CrossPoint Reader
 
 KomaOS is a friendly fork of [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader)
