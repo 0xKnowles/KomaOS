@@ -19,6 +19,8 @@ void BootActivity::onEnter() {
   // Tagline from the brand lockup. Live text rather than part of Logo120: at
   // 120px it would be a few pixels tall and illegible baked into the mark.
   renderer.drawCenteredText(SMALL_FONT_ID, pageHeight - 48, tr(STR_KOMAOS_TAGLINE));
-  renderer.drawCenteredText(SMALL_FONT_ID, pageHeight - 30, KOMAOS_VERSION);
+  // No version line: the tagline is the last thing on the boot screen. The
+  // version is still reachable in Settings > About and is what OTA compares
+  // against, so nothing depends on it being shown here.
   renderer.displayBuffer();
 }
