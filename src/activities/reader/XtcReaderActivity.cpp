@@ -608,8 +608,10 @@ bool XtcReaderActivity::renderFullPage() {
 
   const uint32_t firstStrip = pageGroupStart();
   // A lead-in strip is a whole page by itself; reassembling from it would pull
-  // in the next page's strips.
-  if (firstStrip < xtc->getSplitGeometry().leadingStrips) {
+  // in the next page's strips. Widened first: comparing a uint32_t against the
+  // uint8_t field directly promotes it to int and trips -Wsign-compare.
+  const uint32_t leadingStrips = xtc->getSplitGeometry().leadingStrips;
+  if (firstStrip < leadingStrips) {
     return false;
   }
   for (int i = 0; i < FullPageLayout::STRIPS_PER_PAGE; i++) {

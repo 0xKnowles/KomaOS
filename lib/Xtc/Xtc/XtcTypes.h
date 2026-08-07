@@ -54,6 +54,7 @@ struct XtcSplitGeometry {
   uint8_t stripsPerPage;         // 1 for an unsplit page
   uint16_t overlapPerMille;      // overlap between strips, per-mille of one strip
   uint8_t rotationQuarterTurns;  // quarter turns clockwise applied when storing a strip
+  uint8_t leadingStrips;         // strips before the split run begins (the cover)
   bool valid;
 
   int overlapPercent() const { return (overlapPerMille + 5) / 10; }
