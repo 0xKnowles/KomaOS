@@ -208,7 +208,9 @@ void XtcReaderActivity::loop() {
     return;
   }
 
-  if (ReaderUtils::handleBackNavigation(mappedInput, activityManager, xtc ? xtc->getPath().c_str() : "",
+  // No null check on xtc: loop() returns at the top when it is null, and the
+  // early return added for the menu made that provable to cppcheck.
+  if (ReaderUtils::handleBackNavigation(mappedInput, activityManager, xtc->getPath().c_str(),
                                         {this, [](void* ctx) { static_cast<XtcReaderActivity*>(ctx)->onGoHome(); }})) {
     return;
   }

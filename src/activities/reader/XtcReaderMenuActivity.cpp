@@ -24,7 +24,7 @@ XtcReaderMenuActivity::XtcReaderMenuActivity(GfxRenderer& renderer, MappedInputM
       currentPageBookmarked(currentPageBookmarked) {}
 
 std::vector<XtcReaderMenuActivity::MenuItem> XtcReaderMenuActivity::buildMenuItems(const bool hasChapters,
-                                                                                  const bool hasBookmarks) {
+                                                                                   const bool hasBookmarks) {
   std::vector<MenuItem> items;
   items.reserve(8);
   // Quick jump first: in a 600-strip volume it is the entry reached for most.

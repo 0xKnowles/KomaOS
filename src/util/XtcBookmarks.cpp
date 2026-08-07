@@ -9,7 +9,7 @@
 #include <HalStorage.h>
 #include <Logging.h>
 
-#include "ProgressFile.h"
+#include "activities/reader/ProgressFile.h"
 #endif
 
 namespace XtcBookmarks {
