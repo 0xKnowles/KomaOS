@@ -2106,7 +2106,13 @@ void GfxRenderer::drawTextGlyphsTurned(const int fontId, const int x, const int 
   // by it would overlap narrow glyphs and gap wide ones. A constant cell is
   // also what vertical text conventionally uses.
   const int cell = getLineHeight(resolvedFontId);
-  int cellX = x;
+
+  // Cells are filled from the far end backwards. Turning a glyph turns the
+  // direction its run reads in too: laying cells out along +x put the first
+  // character where the last belongs, so "Amulet Vol 01" came out as
+  // "10 loV telumA" once the device was turned. The run still occupies exactly
+  // [x, x + extent), so callers that measured it for alignment are unaffected.
+  int cellEnd = x + getTurnedTextExtent(resolvedFontId, text);
 
   uint32_t cp;
   while ((cp = utf8NextCodepoint(reinterpret_cast<const uint8_t**>(&text)))) {
@@ -2122,8 +2128,8 @@ void GfxRenderer::drawTextGlyphsTurned(const int fontId, const int x, const int 
     //
     // Anchored at the cell's trailing edge because this mapping grows back from
     // its cursor rather than forward from it.
-    renderCharImpl<TextRotation::Rotated90CCW>(*this, renderMode, font, cp, cellX + cell, y, black, style);
-    cellX += cell;
+    renderCharImpl<TextRotation::Rotated90CCW>(*this, renderMode, font, cp, cellEnd, y, black, style);
+    cellEnd -= cell;
   }
 }
 
