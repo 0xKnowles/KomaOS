@@ -23,20 +23,40 @@ namespace CollectionMetrics {
 // with a modest history.
 constexpr int COLUMNS = 4;
 constexpr int ROWS = 2;
-constexpr int COVER_HEIGHT = 150;
+constexpr int COVER_HEIGHT = 138;
 /** Ledge the covers stand on. */
 constexpr int SHELF_THICKNESS = 5;
 /** Gap between a shelf ledge and the next row of covers. */
-constexpr int ROW_GAP = 10;
+constexpr int ROW_GAP = 8;
 /** Strip under the grid holding the selected book's title. */
 constexpr int TITLE_STRIP_HEIGHT = 14;
 
 constexpr int ROW_HEIGHT = COVER_HEIGHT + SHELF_THICKNESS + ROW_GAP;
+constexpr int TILE_HEIGHT = ROWS * ROW_HEIGHT + TITLE_STRIP_HEIGHT;
+
+// The home screen draws the button menu directly under this block, and the rect
+// it is given has a fixed height that does NOT subtract the cover tile -- so
+// nothing at runtime stops a tall shelf from pushing the last menu row into the
+// button hints. Check it here instead.
+//
+// Worst case is five rows: Browse / Recent / OPDS / Transfer / Settings.
+// "Continue Reading" is not among them because Lyra sets
+// homeContinueReadingInMenu = false, which this theme inherits.
+namespace layout_check {
+constexpr int MENU_ROWS_WORST_CASE = 5;
+constexpr int PORTRAIT_PANEL_HEIGHT = 800;
+constexpr int MENU_TOP = LyraMetrics::values.homeTopPadding + TILE_HEIGHT + LyraMetrics::values.homeMenuTopOffset;
+constexpr int MENU_HEIGHT = MENU_ROWS_WORST_CASE * LyraMetrics::values.menuRowHeight +
+                            (MENU_ROWS_WORST_CASE - 1) * LyraMetrics::values.menuSpacing;
+static_assert(MENU_TOP + MENU_HEIGHT <= PORTRAIT_PANEL_HEIGHT - LyraMetrics::values.buttonHintsHeight,
+              "Collection shelf is too tall: the home menu would overrun the button hints. "
+              "Reduce COVER_HEIGHT or ROW_GAP.");
+}  // namespace layout_check
 
 constexpr ThemeMetrics values = [] {
   ThemeMetrics v = LyraMetrics::values;
   v.homeCoverHeight = COVER_HEIGHT;
-  v.homeCoverTileHeight = ROWS * ROW_HEIGHT + TITLE_STRIP_HEIGHT;
+  v.homeCoverTileHeight = TILE_HEIGHT;
   v.homeRecentBooksCount = COLUMNS * ROWS;
   return v;
 }();

@@ -20,7 +20,7 @@ using namespace CollectionMetrics;
 namespace {
 
 /** Breathing room either side of a cover inside its grid cell. */
-constexpr int TILE_H_PADDING = 8;
+constexpr int TILE_H_PADDING = 12;
 /** Thickness of the selection bracket drawn around the chosen cover. */
 constexpr int SELECTION_BORDER = 3;
 
