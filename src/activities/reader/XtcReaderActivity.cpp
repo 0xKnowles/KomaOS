@@ -573,7 +573,10 @@ bool XtcReaderActivity::renderFullPage() {
   uint8_t* strip = stripOwner.get();
 
   const size_t xtgRowBytes = (stripWidth + 7) / 8;
-  const xtc::XthPage xth{stripWidth, stripHeight};
+  // Built once over the reused strip buffer: XthPage only stores the payload
+  // pointer and the plane offsets, so it stays valid as each strip is loaded
+  // into the same allocation.
+  const xtc::XthPage xth{strip, stripWidth, stripHeight};
 
   renderer.clearScreen();
 
