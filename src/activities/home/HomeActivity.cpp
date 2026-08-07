@@ -9,6 +9,7 @@
 #include <Utf8.h>
 #include <Xtc.h>
 
+#include <algorithm>
 #include <cstring>
 #include <vector>
 
@@ -19,6 +20,7 @@
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/SeriesTitle.h"
 
 int HomeActivity::getMenuItemCount() const {
   int count = 4;  // File Browser, Recents, File transfer, Settings
@@ -44,6 +46,17 @@ void HomeActivity::loadRecentBooks(int maxBooks) {
 
     // Skip if file no longer exists
     if (RecentBooksStore::isMissing(book)) {
+      continue;
+    }
+
+    // With grouping on, a series occupies one slot at its most recently read
+    // volume. RECENT_BOOKS is already most-recent-first, so the first volume of
+    // a series encountered is the one to keep and later ones are dropped.
+    // Without this, reading three volumes back to back fills most of the shelf
+    // with one series and buries everything else.
+    if (UITheme::getInstance().getMetrics().homeGroupRecentsBySeries &&
+        std::any_of(recentBooks.begin(), recentBooks.end(),
+                    [&book](const RecentBook& kept) { return SeriesTitle::sameSeries(kept.title, book.title); })) {
       continue;
     }
 

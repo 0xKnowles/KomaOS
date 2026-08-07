@@ -12,6 +12,7 @@
 #include "components/UITheme.h"
 #include "components/icons/cover.h"
 #include "fontIds.h"
+#include "util/SeriesTitle.h"
 
 // File scope, not inside the anonymous namespace below: drawRecentBookCover
 // itself needs COLUMNS/ROWS/ROW_HEIGHT too.
@@ -23,6 +24,17 @@ namespace {
 constexpr int TILE_H_PADDING = 12;
 /** Thickness of the selection bracket drawn around the chosen cover. */
 constexpr int SELECTION_BORDER = 3;
+
+/** Thinner than a shelf ledge: the header rule is a boundary, not furniture. */
+constexpr int HEADER_LEDGE_THICKNESS = 2;
+
+/** Volume badge sits in the cover's bottom-left corner. */
+constexpr int BADGE_PADDING = 3;
+
+/** Accent tab marking the selected menu row. */
+constexpr int MENU_ACCENT_WIDTH = 4;
+/** Inset so the tab floats inside the row's rounded fill instead of fighting its corners. */
+constexpr int MENU_ACCENT_INSET = 6;
 
 struct CellGeometry {
   int x;       // left edge of the cell
@@ -84,21 +96,42 @@ void drawCoverArt(GfxRenderer& renderer, const RecentBook& book, const CellGeome
 
   // Outline every cover so a light cover does not bleed into the paper.
   renderer.drawRect(cell.coverX, cell.y, cell.coverW, COVER_HEIGHT, true);
+
+  // Volume badge, reversed out of a solid block in the bottom-left corner.
+  // Cover art is unpredictable, so plain text over it would be illegible on a
+  // dark cover; the block guarantees contrast whatever is underneath.
+  const SeriesTitle::Parsed parsed = SeriesTitle::parse(book.title);
+  if (parsed.hasVolume()) {
+    const std::string label = SeriesTitle::badge(parsed.volume);
+    const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, label.c_str(), EpdFontFamily::BOLD);
+    const int lineHeight = renderer.getLineHeight(SMALL_FONT_ID);
+    const int badgeW = textWidth + 2 * BADGE_PADDING;
+    const int badgeH = lineHeight + BADGE_PADDING;
+    const int badgeX = cell.coverX + 1;
+    const int badgeY = cell.y + COVER_HEIGHT - badgeH - 1;
+
+    renderer.fillRect(badgeX, badgeY, badgeW, badgeH, true);
+    renderer.drawText(SMALL_FONT_ID, badgeX + BADGE_PADDING, badgeY, label.c_str(), false, EpdFontFamily::BOLD);
+  }
+}
+
+/**
+ * The theme's signature rule: a solid bar with a dithered lip under it.
+ *
+ * Used for the shelf ledges and again under the header, so every screen carries
+ * the same edge treatment rather than the motif living only on the home screen.
+ * The dithered lip reads as depth on 1-bit e-ink, where a second solid line
+ * would just look like a thicker bar.
+ */
+void drawLedge(const GfxRenderer& renderer, const int x, const int y, const int width, const int thickness) {
+  renderer.fillRect(x, y, width, thickness, true);
+  renderer.fillRectDither(x, y + thickness, width, 2, Color::LightGray);
 }
 
 /** The ledge a row of covers stands on, drawn full width like a real shelf. */
 void drawShelf(const GfxRenderer& renderer, const Rect& rect, const int row) {
-  const int shelfY = rect.y + row * ROW_HEIGHT + COVER_HEIGHT;
-  renderer.fillRect(rect.x, shelfY, rect.width, SHELF_THICKNESS, true);
-  // A dithered lip under the solid ledge reads as depth on 1-bit e-ink, where a
-  // second solid line would just look like a thicker shelf.
-  renderer.fillRectDither(rect.x, shelfY + SHELF_THICKNESS, rect.width, 2, Color::LightGray);
+  drawLedge(renderer, rect.x, rect.y + row * ROW_HEIGHT + COVER_HEIGHT, rect.width, SHELF_THICKNESS);
 }
-
-/** Accent tab marking the selected menu row. */
-constexpr int MENU_ACCENT_WIDTH = 4;
-/** Inset so the tab floats inside the row's rounded fill instead of fighting its corners. */
-constexpr int MENU_ACCENT_INSET = 6;
 
 /** Bracket around the selected cover: drawn outside it so no art is hidden. */
 void drawSelection(const GfxRenderer& renderer, const CellGeometry& cell) {
@@ -190,4 +223,13 @@ void CollectionTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int butto
                               Color::DarkGray);
     }
   }
+}
+
+void CollectionTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title,
+                                 const char* subtitle) const {
+  LyraTheme::drawHeader(renderer, rect, title, subtitle);
+  // Same edge treatment as a shelf ledge, so file browser, settings and reader
+  // screens all read as part of the same theme rather than plain Lyra with a
+  // different home screen.
+  drawLedge(renderer, rect.x, rect.y + rect.height - HEADER_LEDGE_THICKNESS, rect.width, HEADER_LEDGE_THICKNESS);
 }

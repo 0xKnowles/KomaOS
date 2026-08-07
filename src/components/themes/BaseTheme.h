@@ -52,6 +52,10 @@ struct ThemeMetrics {
   int homeCoverTileHeight;
   int homeRecentBooksCount;
   bool homeContinueReadingInMenu;
+  // Collapse the recents list so each series appears once, at its most recently
+  // read volume. Only the shelf themes want this; a one-or-three-card home
+  // screen has too few slots for the dedupe to be worth the surprise.
+  bool homeGroupRecentsBySeries;
   int homeMenuTopOffset;
 
   int buttonHintsHeight;
@@ -129,6 +133,7 @@ constexpr ThemeMetrics values = {.batteryWidth = 15,
                                  .homeCoverTileHeight = 400,
                                  .homeRecentBooksCount = 1,
                                  .homeContinueReadingInMenu = false,
+                                 .homeGroupRecentsBySeries = false,
                                  .homeMenuTopOffset = 10,
                                  .buttonHintsHeight = 40,
                                  .sideButtonHintsWidth = 30,

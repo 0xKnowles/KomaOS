@@ -197,8 +197,14 @@ XtcReaderActivity::StatusBarInfo XtcReaderActivity::getStatusBarInfo() const {
   const int bookPage = static_cast<int>(currentPage) + 1;
   std::string title = sb.titleMode == KomaSettings::STATUS_BAR_TITLE::BOOK_TITLE ? xtc->getTitle() : "";
 
+  // Reading direction is otherwise invisible: turning RTL on gives no feedback
+  // beyond the controls behaving differently, which is indistinguishable from
+  // having pressed the wrong button. Prefixing the title is enough to confirm
+  // it took, and costs no status-bar layout change.
+  const char* directionMark = readingRightToLeft ? "\xE2\x86\x90 " : "";
+
   if (!xtc->hasChapters()) {
-    return StatusBarInfo{bookPage, bookPageCount, std::move(title)};
+    return StatusBarInfo{bookPage, bookPageCount, directionMark + title};
   }
 
   const auto& chapters = xtc->getChapters();
@@ -207,7 +213,7 @@ XtcReaderActivity::StatusBarInfo XtcReaderActivity::getStatusBarInfo() const {
   });
 
   if (chapterIt == chapters.end() || chapterIt->endPage < chapterIt->startPage) {
-    return StatusBarInfo{bookPage, bookPageCount, std::move(title)};
+    return StatusBarInfo{bookPage, bookPageCount, directionMark + title};
   }
 
   if (sb.titleMode == KomaSettings::STATUS_BAR_TITLE::CHAPTER_TITLE) {
@@ -215,7 +221,7 @@ XtcReaderActivity::StatusBarInfo XtcReaderActivity::getStatusBarInfo() const {
   }
 
   return StatusBarInfo{static_cast<int>(currentPage - chapterIt->startPage) + 1,
-                       static_cast<int>(chapterIt->endPage - chapterIt->startPage) + 1, std::move(title)};
+                       static_cast<int>(chapterIt->endPage - chapterIt->startPage) + 1, directionMark + title};
 }
 
 void XtcReaderActivity::renderStatusBarOverlay(const StatusBarOverlayPosition position) const {

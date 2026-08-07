@@ -58,6 +58,7 @@ constexpr ThemeMetrics values = [] {
   v.homeCoverHeight = COVER_HEIGHT;
   v.homeCoverTileHeight = TILE_HEIGHT;
   v.homeRecentBooksCount = COLUMNS * ROWS;
+  v.homeGroupRecentsBySeries = true;
   return v;
 }();
 
@@ -75,4 +76,7 @@ class CollectionTheme : public LyraTheme {
   void drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
                       const std::function<std::string(int index)>& buttonLabel,
                       const std::function<UIIcon(int index)>& rowIcon) const override;
+  // Carries the shelf's ledge motif onto every other screen.
+  void drawHeader(const GfxRenderer& renderer, Rect rect, const char* title,
+                  const char* subtitle = nullptr) const override;
 };
