@@ -324,6 +324,8 @@ void CollectionTheme::drawStatsBox(const GfxRenderer& renderer, const Rect rect,
 
   const int cellWidth = (boxW - 2 * STATS_PADDING) / 3;
   const int cellsX = boxX + STATS_PADDING;
+  // Three labels share the box's width, so each has roughly 148px. Anything
+  // longer is clipped rather than wrapped -- keep translations of these short.
   const char* labels[3] = {tr(STR_STAT_VOLUME), tr(STR_STAT_PAGE), tr(STR_STAT_DONE)};
   const char* values[3] = {volumeText, pageText, percentText};
 

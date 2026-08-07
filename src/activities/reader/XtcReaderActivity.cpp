@@ -9,6 +9,7 @@
 
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
+#include <HalPowerManager.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <Logging.h>
@@ -34,6 +35,24 @@
 #include "util/ScreenshotUtil.h"
 #include "util/XtcBookmarks.h"
 #include "util/XtcProgress.h"
+
+namespace {
+
+// Geometry of the right-edge status column (XTC_STATUS_BAR_RIGHT).
+/** Gap between the column's rule and its contents, on both sides. */
+constexpr int SIDE_BAR_PADDING = 5;
+/** Vertical gap between stacked elements in the column. */
+constexpr int SIDE_BAR_GAP = 4;
+/** Narrow enough that a two-digit count still gets a readable column. */
+constexpr int SIDE_BAR_MIN_WIDTH = 26;
+/** Ceiling, so a pathological page count cannot eat the artwork. */
+constexpr int SIDE_BAR_MAX_WIDTH = 52;
+/** Thickness of the vertical progress bar. */
+constexpr int SIDE_BAR_BAR_WIDTH = 7;
+/** Square marking a bookmarked page. */
+constexpr int SIDE_BAR_BOOKMARK_SIZE = 7;
+
+}  // namespace
 
 void XtcReaderActivity::onEnter() {
   Activity::onEnter();
@@ -366,6 +385,134 @@ void XtcReaderActivity::renderStatusBarOverlay(const StatusBarOverlayPosition po
   GUI.drawStatusBar(renderer, progress, pageInfo.currentPage, pageInfo.pageCount, pageInfo.title, paddingBottom);
 }
 
+void XtcReaderActivity::renderSideStatusBar() const {
+  // Text is drawn horizontally in the oriented frame, so in landscape -- which
+  // is how manga is read -- a narrow column on the right holds ordinary
+  // left-to-right numbers stacked down it. No rotated glyphs are involved, and
+  // none are available: GfxRenderer::drawImage already cannot rotate bits.
+  const auto sb = SETTINGS.statusBarSpec();
+
+  const int pageCount = static_cast<int>(xtc->getPageCount());
+  const int displayPage = static_cast<int>(currentPage) + 1;
+  const int bookPercent = pageCount > 0 ? (displayPage * 100) / pageCount : 0;
+  // Chapter-relative when the volume has a TOC, book-relative otherwise; the
+  // horizontal bar reads the same numbers from the same place.
+  const StatusBarInfo info = getStatusBarInfo();
+  const int chapterPercent = info.pageCount > 0 ? (info.currentPage * 100) / info.pageCount : 0;
+
+  // Every lane is opt-in from the same settings the horizontal bar reads, so
+  // turning the page count off means off in either orientation.
+  char pageText[12] = {0};
+  char totalText[12] = {0};
+  char percentText[8] = {0};
+  char batteryText[8] = {0};
+  if (sb.showChapterPageCount) {
+    snprintf(pageText, sizeof(pageText), "%d", info.currentPage);
+    snprintf(totalText, sizeof(totalText), "%d", info.pageCount);
+  }
+  if (sb.showBookProgressPercent) {
+    snprintf(percentText, sizeof(percentText), "%d%%", bookPercent);
+  }
+  if (sb.showBattery) {
+    snprintf(batteryText, sizeof(batteryText), "%u%%", powerManager.getBatteryPercentage());
+  }
+
+  const bool bookmarked = XtcBookmarks::contains(bookmarkedPages, currentPage);
+  const bool hasBar = sb.showsProgressBar();
+  if (pageText[0] == '\0' && percentText[0] == '\0' && batteryText[0] == '\0' && !hasBar && !bookmarked) {
+    return;  // Every lane is off; leave the page its full width.
+  }
+
+  int marginTop, marginRight, marginBottom, marginLeft;
+  renderer.getOrientedViewableTRBL(&marginTop, &marginRight, &marginBottom, &marginLeft);
+
+  // Width follows the widest thing that will actually be drawn -- a 4-digit
+  // volume needs more column than a 2-digit one, and hardcoding either wastes
+  // page width or clips the count.
+  const int lineHeight = renderer.getLineHeight(SMALL_FONT_ID);
+  const char* const measured[] = {pageText, totalText, percentText, batteryText};
+  int textWidth = 0;
+  for (const char* text : measured) {
+    if (text[0] != '\0') {
+      textWidth = std::max(textWidth, renderer.getTextWidth(SMALL_FONT_ID, text));
+    }
+  }
+  const int stripWidth = std::clamp(textWidth + 2 * SIDE_BAR_PADDING, SIDE_BAR_MIN_WIDTH, SIDE_BAR_MAX_WIDTH);
+
+  const int stripX = renderer.getScreenWidth() - marginRight - stripWidth;
+  const int stripTop = marginTop;
+  const int stripBottom = renderer.getScreenHeight() - marginBottom;
+  if (stripX <= 0 || stripBottom - stripTop <= 0) {
+    return;
+  }
+
+  // Clear to the panel edge, not just the strip: the page underneath is drawn
+  // edge to edge and any of it left showing beside the column reads as a
+  // rendering fault rather than a margin.
+  renderer.fillRect(stripX, 0, renderer.getScreenWidth() - stripX, renderer.getScreenHeight(), false);
+  // Rule separating the column from the page, so the numbers do not look like
+  // part of the artwork.
+  renderer.fillRect(stripX, stripTop, 1, stripBottom - stripTop, true);
+
+  const Rect column{stripX + SIDE_BAR_PADDING, stripTop, stripWidth - 2 * SIDE_BAR_PADDING, stripBottom - stripTop};
+  int y = stripTop + SIDE_BAR_PADDING;
+
+  if (readingRightToLeft) {
+    // The horizontal bar shows reading direction by prefixing the title, and
+    // this column has no title lane -- without the arrow here, switching to the
+    // side bar would silently drop the only confirmation that RTL took.
+    UITheme::drawCenteredText(renderer, column, SMALL_FONT_ID, y, "\xE2\x86\x90", true, EpdFontFamily::BOLD);
+    y += lineHeight + SIDE_BAR_GAP;
+  }
+
+  if (pageText[0] != '\0') {
+    UITheme::drawCenteredText(renderer, column, SMALL_FONT_ID, y, pageText, true, EpdFontFamily::BOLD);
+    y += lineHeight;
+    // Hairline standing in for the "/" of "88 / 210", which has nowhere to go
+    // in a column this narrow.
+    renderer.fillRect(column.x + 2, y + 1, column.width - 4, 1, true);
+    y += SIDE_BAR_GAP;
+    UITheme::drawCenteredText(renderer, column, SMALL_FONT_ID, y, totalText, true);
+    y += lineHeight + SIDE_BAR_GAP;
+  }
+
+  if (percentText[0] != '\0') {
+    UITheme::drawCenteredText(renderer, column, SMALL_FONT_ID, y, percentText, true);
+    y += lineHeight + SIDE_BAR_GAP;
+  }
+
+  // Bottom-anchored cluster, filled upwards, so the bar between it and the
+  // numbers takes whatever height is left rather than the bar dictating where
+  // the battery ends up.
+  int bottom = stripBottom - SIDE_BAR_PADDING;
+  if (batteryText[0] != '\0') {
+    bottom -= lineHeight;
+    UITheme::drawCenteredText(renderer, column, SMALL_FONT_ID, bottom, batteryText, true);
+    bottom -= SIDE_BAR_GAP;
+  }
+  if (bookmarked) {
+    bottom -= SIDE_BAR_BOOKMARK_SIZE;
+    renderer.fillRect(column.x + (column.width - SIDE_BAR_BOOKMARK_SIZE) / 2, bottom, SIDE_BAR_BOOKMARK_SIZE,
+                      SIDE_BAR_BOOKMARK_SIZE, true);
+    bottom -= SIDE_BAR_GAP;
+  }
+
+  if (hasBar && bottom - y > SIDE_BAR_GAP) {
+    const int barX = column.x + (column.width - SIDE_BAR_BAR_WIDTH) / 2;
+    const int barHeight = bottom - y;
+    renderer.drawRect(barX, y, SIDE_BAR_BAR_WIDTH, barHeight, true);
+
+    const int progress =
+        sb.progressBarMode == KomaSettings::STATUS_BAR_PROGRESS_BAR::BOOK_PROGRESS ? bookPercent : chapterPercent;
+    // Filled top-down: further down the column is further through the volume,
+    // which is the direction the numbers above it already read in.
+    const int fillHeight = (barHeight - 2) * std::clamp(progress, 0, 100) / 100;
+    if (fillHeight > 0) {
+      renderer.fillRect(barX + 1, y + 1, SIDE_BAR_BAR_WIDTH - 2, fillHeight, true);
+    }
+  }
+}
+
 void XtcReaderActivity::renderPage() {
   const uint16_t pageWidth = xtc->getPageWidth();
   const uint16_t pageHeight = xtc->getPageHeight();
@@ -522,10 +669,17 @@ void XtcReaderActivity::renderPage() {
   }
   // White pixels are already cleared by clearScreen()
 
-  if (SETTINGS.statusBarSpec().xtcMode == KomaSettings::XTC_STATUS_BAR_MODE::XTC_STATUS_BAR_TOP) {
-    renderStatusBarOverlay(StatusBarOverlayPosition::Top);
-  } else {
-    renderStatusBarOverlay(StatusBarOverlayPosition::Bottom);
+  switch (SETTINGS.statusBarSpec().xtcMode) {
+    case KomaSettings::XTC_STATUS_BAR_MODE::XTC_STATUS_BAR_TOP:
+      renderStatusBarOverlay(StatusBarOverlayPosition::Top);
+      break;
+    case KomaSettings::XTC_STATUS_BAR_MODE::XTC_STATUS_BAR_RIGHT:
+      renderSideStatusBar();
+      break;
+    default:
+      // Bottom, and Hide -- renderStatusBarOverlay returns early on Hide.
+      renderStatusBarOverlay(StatusBarOverlayPosition::Bottom);
+      break;
   }
 
   ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh, false, SETTINGS.getMangaRefreshFrequency());

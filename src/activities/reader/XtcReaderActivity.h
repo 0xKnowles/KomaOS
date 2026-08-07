@@ -48,6 +48,10 @@ class XtcReaderActivity final : public Activity {
   // Opens chapter selection when the book has chapters (short-press Confirm); no-op otherwise
   void openChapterSelection();
   void renderStatusBarOverlay(StatusBarOverlayPosition position) const;
+  // The right-edge column. Its own function rather than a third case in
+  // renderStatusBarOverlay: that one delegates to GUI.drawStatusBar, which is
+  // horizontal by construction and shared with the EPUB and TXT readers.
+  void renderSideStatusBar() const;
   StatusBarInfo getStatusBarInfo() const;
   void saveProgress() const;
   void loadProgress();

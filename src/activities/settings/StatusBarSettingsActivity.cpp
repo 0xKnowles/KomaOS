@@ -74,8 +74,11 @@ const StrId progressBarThicknessNames[PROGRESS_BAR_THICKNESS_ITEMS] = {
 constexpr int TITLE_ITEMS = 3;
 const StrId titleNames[TITLE_ITEMS] = {StrId::STR_BOOK, StrId::STR_CHAPTER, StrId::STR_HIDE};
 
-constexpr int XTC_STATUS_BAR_ITEMS = 3;
-const StrId xtcStatusBarNames[XTC_STATUS_BAR_ITEMS] = {StrId::STR_HIDE, StrId::STR_BOTTOM, StrId::STR_TOP};
+// Tied to the enum rather than a literal, so adding a mode without a label here
+// fails the build instead of silently clamping the new mode away below.
+constexpr int XTC_STATUS_BAR_ITEMS = KomaSettings::XTC_STATUS_BAR_MODE_COUNT;
+const StrId xtcStatusBarNames[XTC_STATUS_BAR_ITEMS] = {StrId::STR_HIDE, StrId::STR_BOTTOM, StrId::STR_TOP,
+                                                       StrId::STR_RIGHT_EDGE};
 
 constexpr int STATUS_BAR_CLOCK_ITEMS = KomaSettings::STATUS_BAR_CLOCK_MODE_COUNT;
 const StrId statusBarClockNames[STATUS_BAR_CLOCK_ITEMS] = {StrId::STR_HIDE, StrId::STR_DIR_RIGHT, StrId::STR_DIR_LEFT};

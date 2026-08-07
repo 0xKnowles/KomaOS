@@ -75,6 +75,10 @@ class KomaSettings : public PersistableStore<KomaSettings> {
     XTC_STATUS_BAR_HIDE = 0,
     XTC_STATUS_BAR_BOTTOM = 1,
     XTC_STATUS_BAR_TOP = 2,
+    // A narrow column down the right edge instead of a horizontal strip. Manga
+    // is read in landscape, where a bottom bar eats height the page needs and a
+    // side margin is going spare.
+    XTC_STATUS_BAR_RIGHT = 3,
     XTC_STATUS_BAR_MODE_COUNT
   };
 
