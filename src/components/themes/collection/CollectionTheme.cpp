@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -18,88 +19,146 @@
 #include "util/XtcProgress.h"
 
 // File scope, not inside the anonymous namespace below: the member functions
-// need COLUMNS/ROWS/ROW_HEIGHT too.
+// need the panel metrics too.
 using namespace CollectionMetrics;
 
 namespace {
 
-/** Inset of the whole shelf block from the panel edge. */
-constexpr int SHELF_SIDE_PADDING = 12;
-/** Gutter between the two cards in a row, split evenly. */
-constexpr int CARD_GAP = 10;
-/** Inset of a cover from its card's left edge. */
-constexpr int CARD_PADDING = 5;
-/** Gap between a cover and the text beside it. */
-constexpr int TEXT_GAP = 8;
-/** How far the selection bracket sits outside the cover. */
-constexpr int SELECTION_OFFSET = 3;
-/** Thickness of the selection bracket. */
-constexpr int SELECTION_BORDER = 2;
-
-/** Thinner than a shelf ledge: the header rule is a boundary, not furniture. */
+/** Thinner than a panel border: the header rule is a boundary, not furniture. */
 constexpr int HEADER_LEDGE_THICKNESS = 2;
-
-/** Volume badge sits in the cover's bottom-left corner. */
+/** Volume badge inset from a cover's corner. */
 constexpr int BADGE_PADDING = 3;
-
-/** Breathing room above and below the stats box inside its slot. */
-constexpr int STATS_BOX_MARGIN = 4;
-/** Inset of the stats text from the box outline. */
-constexpr int STATS_PADDING = 5;
-
 /** Accent tab marking the selected menu row. */
 constexpr int MENU_ACCENT_WIDTH = 4;
-/** Inset so the tab floats inside the row's rounded fill instead of fighting its corners. */
 constexpr int MENU_ACCENT_INSET = 6;
 
-struct CellGeometry {
-  int x;       // left edge of the card
-  int y;       // top edge of the card, which is also the cover's top
-  int width;   // card width, gutter already removed
-  int coverX;  // left edge of the cover
-  int textX;   // left edge of the text column beside the cover
-  int textW;   // width available to the text column
+/**
+ * A manga panel: four corners, in clockwise order from the top left.
+ *
+ * Stored as corners rather than a Rect because the whole point is that opposite
+ * edges are not parallel. Every corner carries a few pixels of displacement, so
+ * no two panels share an angle and the block stops reading as a table.
+ */
+struct Koma {
+  int x[4];
+  int y[4];
+
+  int minX() const { return std::min(std::min(x[0], x[1]), std::min(x[2], x[3])); }
+  int maxX() const { return std::max(std::max(x[0], x[1]), std::max(x[2], x[3])); }
+  int minY() const { return std::min(std::min(y[0], y[1]), std::min(y[2], y[3])); }
+  int maxY() const { return std::max(std::max(y[0], y[1]), std::max(y[2], y[3])); }
 };
 
-CellGeometry cellFor(const Rect& rect, const int index) {
-  const int gridWidth = rect.width - 2 * SHELF_SIDE_PADDING;
-  const int cellWidth = gridWidth / COLUMNS;
-  const int column = index % COLUMNS;
-  const int row = index / COLUMNS;
+/**
+ * Builds a panel from an upright rect plus a per-corner slant pattern.
+ *
+ * `pattern` picks one of a fixed set of displacements. Fixed, not random: the
+ * home screen redraws from a cached buffer and a random tilt would jitter every
+ * time the selector moved.
+ */
+Koma komaFrom(const int left, const int top, const int width, const int height, const int pattern) {
+  // dx/dy per corner, in units of SLANT. Each row leans differently so adjacent
+  // panels never line up along a shared edge.
+  static constexpr int8_t SLANTS[4][8] = {
+      {0, 1, 1, 0, 0, -1, -1, 0},
+      {1, 0, 0, 1, -1, 0, 0, -1},
+      {0, -1, 1, 1, 0, 1, -1, -1},
+      {-1, 1, 0, -1, 1, -1, 0, 1},
+  };
+  const int8_t* d = SLANTS[pattern & 3];
 
-  CellGeometry cell{};
-  cell.x = rect.x + SHELF_SIDE_PADDING + column * cellWidth + CARD_GAP / 2;
-  cell.y = rect.y + GRID_TOP_INSET + row * ROW_HEIGHT;
-  cell.width = cellWidth - CARD_GAP;
-  cell.coverX = cell.x + CARD_PADDING;
-  cell.textX = cell.coverX + COVER_WIDTH + TEXT_GAP;
-  cell.textW = cell.x + cell.width - CARD_PADDING - cell.textX;
-  return cell;
+  Koma k{};
+  const int cx[4] = {left, left + width, left + width, left};
+  const int cy[4] = {top, top, top + height, top + height};
+  for (int i = 0; i < 4; i++) {
+    k.x[i] = cx[i] + d[i * 2] * SLANT;
+    k.y[i] = cy[i] + d[i * 2 + 1] * SLANT;
+  }
+  return k;
+}
+
+/** Left and right edge of the panel on a given row, or false when outside it. */
+bool komaSpanAt(const Koma& koma, const int y, int& outLeft, int& outRight) {
+  int left = INT32_MAX;
+  int right = INT32_MIN;
+  for (int i = 0; i < 4; i++) {
+    const int j = (i + 1) & 3;
+    const int y0 = koma.y[i];
+    const int y1 = koma.y[j];
+    if (y0 == y1) continue;
+    if (y < std::min(y0, y1) || y >= std::max(y0, y1)) continue;
+    // Edge crossing this row, by similar triangles.
+    const int cross = koma.x[i] + (koma.x[j] - koma.x[i]) * (y - y0) / (y1 - y0);
+    left = std::min(left, cross);
+    right = std::max(right, cross);
+  }
+  if (left > right) return false;
+  outLeft = left;
+  outRight = right;
+  return true;
 }
 
 /**
- * Draws one cover, or a labelled placeholder when the book has no cover art.
+ * Paints white everywhere inside the panel's bounding box but outside the panel.
  *
- * Returns nothing: a failed cover load falls through to the placeholder rather
- * than leaving a hole, so the shelf never renders with a gap where a volume is.
+ * This is what lets upright cover art sit in a tilted frame: draw the bitmap
+ * across the whole box, then cut it back to the quad. There is no polygon fill
+ * in the renderer and no way to rotate a bitmap, so masking is the only route.
  */
-void drawCoverArt(const GfxRenderer& renderer, const RecentBook& book, const CellGeometry& cell) {
+void maskOutsideKoma(const GfxRenderer& renderer, const Koma& koma) {
+  const int top = koma.minY();
+  const int bottom = koma.maxY();
+  const int left = koma.minX();
+  const int right = koma.maxX();
+
+  for (int y = top; y < bottom; y++) {
+    int spanLeft, spanRight;
+    if (!komaSpanAt(koma, y, spanLeft, spanRight)) {
+      renderer.fillRect(left, y, right - left, 1, false);
+      continue;
+    }
+    if (spanLeft > left) renderer.fillRect(left, y, spanLeft - left, 1, false);
+    if (spanRight < right) renderer.fillRect(spanRight, y, right - spanRight, 1, false);
+  }
+}
+
+/** Inks the panel's four edges. */
+void drawKomaBorder(const GfxRenderer& renderer, const Koma& koma, const int weight) {
+  for (int i = 0; i < 4; i++) {
+    const int j = (i + 1) & 3;
+    renderer.drawLine(koma.x[i], koma.y[i], koma.x[j], koma.y[j], weight, true);
+  }
+}
+
+/** Dithered fill inside the panel, for a placeholder or an emphasis panel. */
+void fillKoma(const GfxRenderer& renderer, const Koma& koma, const Color color) {
+  for (int y = koma.minY(); y < koma.maxY(); y++) {
+    int spanLeft, spanRight;
+    if (komaSpanAt(koma, y, spanLeft, spanRight) && spanRight > spanLeft) {
+      renderer.fillRectDither(spanLeft, y, spanRight - spanLeft, 1, color);
+    }
+  }
+}
+
+/** Cover art filling the panel, cut back to its quad. */
+void drawKomaCover(const GfxRenderer& renderer, const RecentBook& book, const Koma& koma) {
+  const int left = koma.minX();
+  const int top = koma.minY();
+  const int width = koma.maxX() - left;
+  const int height = koma.maxY() - top;
   bool hasCover = false;
 
   if (!book.coverBmpPath.empty()) {
-    const std::string coverBmpPath = UITheme::getCoverThumbPath(book.coverBmpPath, COVER_HEIGHT);
-
     HalFile file;
-    if (Storage.openFileForRead("HOME", coverBmpPath, file)) {
+    if (Storage.openFileForRead("HOME", UITheme::getCoverThumbPath(book.coverBmpPath, COVER_HEIGHT), file)) {
       Bitmap bitmap(file);
       if (bitmap.parseHeaders() == BmpReaderError::Ok && bitmap.getHeight() > 0) {
-        // Crop horizontally to fill the slot rather than letterboxing: manga
-        // covers vary in aspect and a ragged shelf edge reads as a bug.
+        // Crop to fill rather than letterbox: a panel with paper showing down
+        // one side reads as a mistake, not a margin.
         const float coverRatio = static_cast<float>(bitmap.getWidth()) / static_cast<float>(bitmap.getHeight());
-        const float slotRatio = static_cast<float>(COVER_WIDTH) / static_cast<float>(COVER_HEIGHT);
+        const float slotRatio = static_cast<float>(width) / static_cast<float>(height);
         const float cropX = coverRatio > 0.0f ? 1.0f - (slotRatio / coverRatio) : 0.0f;
-
-        renderer.drawBitmap(bitmap, cell.coverX, cell.y, COVER_WIDTH, COVER_HEIGHT, std::max(0.0f, cropX));
+        renderer.drawBitmap(bitmap, left, top, width, height, std::max(0.0f, cropX));
         hasCover = true;
       }
       file.close();
@@ -107,116 +166,63 @@ void drawCoverArt(const GfxRenderer& renderer, const RecentBook& book, const Cel
   }
 
   if (!hasCover) {
-    // Placeholder: a grey block with the cover glyph, so an un-thumbnailed book
-    // still occupies its slot and stays selectable.
-    renderer.fillRectDither(cell.coverX, cell.y, COVER_WIDTH, COVER_HEIGHT, Color::LightGray);
-    renderer.drawIcon(CoverIcon, cell.coverX + (COVER_WIDTH - 32) / 2, cell.y + (COVER_HEIGHT - 32) / 2, 32);
+    fillKoma(renderer, koma, Color::LightGray);
+    renderer.drawIcon(CoverIcon, left + (width - 32) / 2, top + (height - 32) / 2, 32);
   }
 
-  // Cover art is a rectangle whatever we do with it, so round it by painting
-  // white back over the four corners, then outline the rounded shape. Without
-  // the mask the outline's curve would have square bitmap corners poking
-  // through it.
-  renderer.maskRoundedRectOutsideCorners(cell.coverX, cell.y, COVER_WIDTH, COVER_HEIGHT, CORNER_RADIUS);
-  // Outline every cover so a light one does not bleed into the paper.
-  renderer.drawRoundedRect(cell.coverX, cell.y, COVER_WIDTH, COVER_HEIGHT, 1, CORNER_RADIUS, true);
-
-  // Volume badge, reversed out of a solid block in the bottom-left corner.
-  // Cover art is unpredictable, so plain text over it would be illegible on a
-  // dark cover; the block guarantees contrast whatever is underneath.
-  const SeriesTitle::Parsed parsed = SeriesTitle::parse(book.title);
-  if (parsed.hasVolume()) {
-    const std::string label = SeriesTitle::badge(parsed.volume);
-    const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, label.c_str(), EpdFontFamily::BOLD);
-    const int lineHeight = renderer.getLineHeight(SMALL_FONT_ID);
-    const int badgeW = textWidth + 2 * BADGE_PADDING;
-    const int badgeH = lineHeight + BADGE_PADDING;
-    // Inset by the corner radius so the badge sits inside the rounded outline
-    // rather than being clipped by the curve.
-    const int badgeX = cell.coverX + CORNER_RADIUS;
-    const int badgeY = cell.y + COVER_HEIGHT - badgeH - CORNER_RADIUS;
-
-    renderer.fillRect(badgeX, badgeY, badgeW, badgeH, true);
-    renderer.drawText(SMALL_FONT_ID, badgeX + BADGE_PADDING, badgeY, label.c_str(), false, EpdFontFamily::BOLD);
-  }
+  maskOutsideKoma(renderer, koma);
+  drawKomaBorder(renderer, koma, BORDER);
 }
 
-/**
- * Series name and volume in the space beside the cover.
- *
- * The series name rather than the raw title: "Berserk v03" already carries its
- * volume on the badge, so repeating it here would waste two of the three lines
- * this column has.
- */
-void drawCoverLabel(const GfxRenderer& renderer, const RecentBook& book, const CellGeometry& cell) {
-  if (cell.textW <= 0) {
-    return;
-  }
-
+/** Volume badge, reversed out of solid ink so it reads over any artwork. */
+void drawVolumeBadge(const GfxRenderer& renderer, const RecentBook& book, const Koma& koma) {
   const SeriesTitle::Parsed parsed = SeriesTitle::parse(book.title);
-  const std::string& name = parsed.series.empty() ? book.title : parsed.series;
+  if (!parsed.hasVolume()) return;
 
+  const std::string label = SeriesTitle::badge(parsed.volume);
+  const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, label.c_str(), EpdFontFamily::BOLD);
   const int lineHeight = renderer.getLineHeight(SMALL_FONT_ID);
-  const auto lines = renderer.wrappedText(SMALL_FONT_ID, name.c_str(), cell.textW, 3, EpdFontFamily::BOLD);
+  const int badgeW = textWidth + 2 * BADGE_PADDING;
+  const int badgeH = lineHeight + BADGE_PADDING;
+  // Anchored to the bottom-left corner's own position, so the badge leans with
+  // the panel instead of floating off a tilted edge.
+  const int badgeX = koma.x[3] + SLANT + BADGE_PADDING;
+  const int badgeY = koma.y[3] - badgeH - BADGE_PADDING;
 
-  // Author only if the wrapped name left room for it, so a long series name is
-  // never traded against a line of text nobody is looking for.
-  const bool showAuthor = !book.author.empty() && lines.size() <= 2;
-  const int blockHeight = static_cast<int>(lines.size()) * lineHeight + (showAuthor ? lineHeight * 3 / 2 : 0);
-
-  int y = cell.y + (COVER_HEIGHT - blockHeight) / 2;
-  for (const auto& line : lines) {
-    renderer.drawText(SMALL_FONT_ID, cell.textX, y, line.c_str(), true, EpdFontFamily::BOLD);
-    y += lineHeight;
-  }
-  if (showAuthor) {
-    y += lineHeight / 2;
-    renderer.drawText(SMALL_FONT_ID, cell.textX, y,
-                      renderer.truncatedText(SMALL_FONT_ID, book.author.c_str(), cell.textW).c_str(), true);
-  }
+  renderer.fillRect(badgeX, badgeY, badgeW, badgeH, true);
+  renderer.drawText(SMALL_FONT_ID, badgeX + BADGE_PADDING, badgeY, label.c_str(), false, EpdFontFamily::BOLD);
 }
 
-/**
- * The theme's signature rule: a solid bar with a dithered lip under it.
- *
- * Used for the shelf ledges and again under the header, so every screen carries
- * the same edge treatment rather than the motif living only on the home screen.
- * The dithered lip reads as depth on 1-bit e-ink, where a second solid line
- * would just look like a thicker bar.
- */
+/** Selection bracket: a second border outside the panel, following its slant. */
+void drawKomaSelection(const GfxRenderer& renderer, const Koma& koma) {
+  const int cx = (koma.minX() + koma.maxX()) / 2;
+  const int cy = (koma.minY() + koma.maxY()) / 2;
+  Koma outer{};
+  for (int i = 0; i < 4; i++) {
+    // Pushed outward from the centre, so the bracket stays parallel to the edge
+    // it marks rather than closing in at the corners.
+    outer.x[i] = koma.x[i] + (koma.x[i] > cx ? 3 : -3);
+    outer.y[i] = koma.y[i] + (koma.y[i] > cy ? 3 : -3);
+  }
+  drawKomaBorder(renderer, outer, BORDER);
+}
+
+/** The header's edge treatment, carried over from the panel borders. */
 void drawLedge(const GfxRenderer& renderer, const int x, const int y, const int width, const int thickness) {
   renderer.fillRect(x, y, width, thickness, true);
   renderer.fillRectDither(x, y + thickness, width, 2, Color::LightGray);
 }
 
-/** The ledge a row of cards stands on, drawn full width like a real shelf. */
-void drawShelf(const GfxRenderer& renderer, const Rect& rect, const int row) {
-  drawLedge(renderer, rect.x + SHELF_SIDE_PADDING, rect.y + GRID_TOP_INSET + row * ROW_HEIGHT + COVER_HEIGHT,
-            rect.width - 2 * SHELF_SIDE_PADDING, SHELF_THICKNESS);
-}
+/** Panel geometry for slot `index`: 0 is the hero, 1 and 2 the stack beside it. */
+Koma panelFor(const Rect& rect, const int index) {
+  const int left = rect.x + MARGIN;
+  const int top = rect.y + SLANT;
+  const int sideLeft = left + HERO_WIDTH + GUTTER;
+  const int sideWidth = rect.width - MARGIN - sideLeft + rect.x;
 
-/**
- * Bracket around the selected card.
- *
- * Drawn outside the cover so no art is hidden, and around the whole card so the
- * series name beside it is visibly part of the same selection. It stops at the
- * shelf line: a bracket that crossed the ledge would read as a box floating in
- * front of the shelf rather than a volume standing on it.
- */
-void drawSelection(const GfxRenderer& renderer, const CellGeometry& cell) {
-  for (int i = 0; i < SELECTION_BORDER; i++) {
-    const int inset = SELECTION_OFFSET - i;
-    renderer.drawRoundedRect(cell.coverX - inset, cell.y - inset, COVER_WIDTH + 2 * inset, COVER_HEIGHT + 2 * inset, 1,
-                             CORNER_RADIUS + inset, true);
-  }
-}
-
-/** One label-over-value column of the stats box. */
-void drawStatCell(const GfxRenderer& renderer, const Rect& cellRect, const char* label, const char* value) {
-  const int lineHeight = renderer.getLineHeight(SMALL_FONT_ID);
-  const int top = cellRect.y + (cellRect.height - 2 * lineHeight) / 2;
-  UITheme::drawCenteredText(renderer, cellRect, SMALL_FONT_ID, top, label, true);
-  UITheme::drawCenteredText(renderer, cellRect, SMALL_FONT_ID, top + lineHeight, value, true, EpdFontFamily::BOLD);
+  if (index == 0) return komaFrom(left, top, HERO_WIDTH, HERO_HEIGHT, 0);
+  if (index == 1) return komaFrom(sideLeft, top, sideWidth, SIDE_HEIGHT, 1);
+  return komaFrom(sideLeft, top + SIDE_HEIGHT + GUTTER, sideWidth, SIDE_HEIGHT, 2);
 }
 
 }  // namespace
@@ -229,35 +235,23 @@ void CollectionTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, cons
     return;
   }
 
-  const int bookCount = std::min(static_cast<int>(recentBooks.size()), COLUMNS * ROWS);
-  // Captured before the compose below flips coverRendered: a recompose is
-  // exactly when the recent list can have changed under the progress cache.
+  const int bookCount = std::min(static_cast<int>(recentBooks.size()), PANEL_COUNT);
   const bool composing = !coverRendered;
 
-  // Covers come off the SD card once, then the composed shelf is cached in the
-  // stored buffer; only the selection bracket and the stats box are redrawn per
-  // frame. Re-reading four BMPs on every selector move would make the home
-  // screen unusable.
+  // Covers come off the SD card once and the composed block is cached; only the
+  // selection bracket and the stats panel are redrawn per frame. The masking
+  // here is per-row work, so recomposing on every selector move would be far
+  // more expensive than the old grid was.
   if (!coverRendered) {
     for (int i = 0; i < bookCount; i++) {
-      const CellGeometry cell = cellFor(rect, i);
-      drawCoverArt(renderer, recentBooks[i], cell);
-      drawCoverLabel(renderer, recentBooks[i], cell);
+      const Koma koma = panelFor(rect, i);
+      drawKomaCover(renderer, recentBooks[i], koma);
+      drawVolumeBadge(renderer, recentBooks[i], koma);
     }
-    for (int row = 0; row < ROWS; row++) {
-      // Draw a shelf under any row that has at least one book on it.
-      if (row * COLUMNS < bookCount) {
-        drawShelf(renderer, rect, row);
-      }
-    }
-
     coverBufferStored = storeCoverBuffer();
-    coverRendered = coverBufferStored;  // Only "rendered" if the buffer actually stored
+    coverRendered = coverBufferStored;
   }
 
-  // Progress is read on the same pass as the covers, and kept until the shelf
-  // is next recomposed -- which is exactly when the recent list can have
-  // changed underneath it.
   if (composing || !shelfProgressLoaded) {
     for (int i = 0; i < static_cast<int>(shelfProgress.size()); i++) {
       shelfProgress[i] =
@@ -267,37 +261,30 @@ void CollectionTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, cons
   }
 
   if (selectorIndex >= 0 && selectorIndex < bookCount) {
-    drawSelection(renderer, cellFor(rect, selectorIndex));
+    drawKomaSelection(renderer, panelFor(rect, selectorIndex));
   }
 
-  drawStatsBox(renderer, rect, recentBooks, selectorIndex);
+  drawStatsKoma(renderer, rect, recentBooks, selectorIndex);
 }
 
-void CollectionTheme::drawStatsBox(const GfxRenderer& renderer, const Rect rect,
-                                   const std::vector<RecentBook>& recentBooks, const int selectorIndex) const {
-  const int slotY = rect.y + GRID_TOP_INSET + ROWS * ROW_HEIGHT;
+void CollectionTheme::drawStatsKoma(const GfxRenderer& renderer, const Rect rect,
+                                    const std::vector<RecentBook>& recentBooks, const int selectorIndex) const {
+  const int slotTop = rect.y + SLANT + HERO_HEIGHT + GUTTER;
 
   // Cleared and redrawn every frame: it reports the selected volume, so unlike
-  // the shelf above it, the copy held in the stored cover buffer is stale the
-  // moment the selector moves.
-  renderer.fillRect(rect.x, slotY, rect.width, STATS_BOX_HEIGHT, false);
+  // the panels above it the copy in the stored buffer is stale the moment the
+  // selector moves. Cleared past the slant so a leaning border leaves no trail.
+  renderer.fillRect(rect.x, slotTop - SLANT, rect.width, STATS_HEIGHT + 2 * SLANT, false);
 
-  const int boxX = rect.x + SHELF_SIDE_PADDING;
-  const int boxY = slotY + STATS_BOX_MARGIN;
-  const int boxW = rect.width - 2 * SHELF_SIDE_PADDING;
-  const int boxH = STATS_BOX_HEIGHT - 2 * STATS_BOX_MARGIN;
+  const Koma koma = komaFrom(rect.x + MARGIN, slotTop, rect.width - 2 * MARGIN, STATS_HEIGHT, 3);
+  drawKomaBorder(renderer, koma, BORDER);
 
-  renderer.drawRoundedRect(boxX, boxY, boxW, boxH, 1, CORNER_RADIUS, true);
-
-  const int bookCount = std::min(static_cast<int>(recentBooks.size()), COLUMNS * ROWS);
+  const int bookCount = std::min(static_cast<int>(recentBooks.size()), PANEL_COUNT);
   const bool hasSelection = selectorIndex >= 0 && selectorIndex < bookCount;
 
-  // Volume, page position and percentage of whichever card is selected. Not
-  // library-wide totals: the recent list handed to this theme is already capped
-  // at four and collapsed to one entry per series, so any "total" drawn from it
-  // would be a count of the shelf, dressed up as a count of the library.
-  // Default to a dash: a cell whose value cannot be computed says so, rather
-  // than showing a plausible-looking zero.
+  // The selected volume, not a library total: the recent list handed to this
+  // theme is already capped and collapsed to one entry per series, so any
+  // "total" drawn from it would be a count of this block dressed up as one.
   char volumeText[8] = "--";
   char pageText[24] = "--";
   char percentText[8] = "--";
@@ -307,38 +294,42 @@ void CollectionTheme::drawStatsBox(const GfxRenderer& renderer, const Rect rect,
     if (parsed.hasVolume()) {
       snprintf(volumeText, sizeof(volumeText), "%s", SeriesTitle::badge(parsed.volume).c_str());
     }
-
     const XtcProgress::Snapshot& progress = shelfProgress[selectorIndex];
     if (progress.hasPageCount()) {
-      // Page position as well as the percentage: "88 / 210" is what you act on
-      // when hunting a scene, and the percentage is what you glance at.
       snprintf(pageText, sizeof(pageText), "%lu / %lu", static_cast<unsigned long>(progress.page + 1),
                static_cast<unsigned long>(progress.pageCount));
       snprintf(percentText, sizeof(percentText), "%d%%", progress.percent());
     } else if (progress.valid) {
-      // Progress written by older firmware, or an EPUB on the shelf: the page
-      // is known but nothing it could be a fraction of is.
       snprintf(pageText, sizeof(pageText), "%lu", static_cast<unsigned long>(progress.page + 1));
     }
   }
 
-  const int cellWidth = (boxW - 2 * STATS_PADDING) / 3;
-  const int cellsX = boxX + STATS_PADDING;
-  // Three labels share the box's width, so each has roughly 148px. Anything
-  // longer is clipped rather than wrapped -- keep translations of these short.
+  // Title across the top of the panel, stats in a row beneath it.
+  const int lineHeight = renderer.getLineHeight(SMALL_FONT_ID);
+  const int innerLeft = koma.minX() + BORDER + 6;
+  const int innerWidth = koma.maxX() - innerLeft - BORDER - 6;
+  const int innerTop = koma.minY() + SLANT + 4;
+
+  if (hasSelection && innerWidth > 0) {
+    const SeriesTitle::Parsed parsed = SeriesTitle::parse(recentBooks[selectorIndex].title);
+    const std::string& name = parsed.series.empty() ? recentBooks[selectorIndex].title : parsed.series;
+    renderer.drawText(SMALL_FONT_ID, innerLeft, innerTop,
+                      renderer.truncatedText(SMALL_FONT_ID, name.c_str(), innerWidth).c_str(), true,
+                      EpdFontFamily::BOLD);
+  }
+
+  // Three labelled figures. Short labels: they share the panel's width and clip
+  // rather than wrap.
   const char* labels[3] = {tr(STR_STAT_VOLUME), tr(STR_STAT_PAGE), tr(STR_STAT_DONE)};
   const char* values[3] = {volumeText, pageText, percentText};
+  const int cellWidth = innerWidth / 3;
+  const int statsY = innerTop + lineHeight + 2;
 
   for (int i = 0; i < 3; i++) {
-    drawStatCell(renderer, Rect{cellsX + i * cellWidth, boxY, cellWidth, boxH}, labels[i], values[i]);
-
-    // Dotted dividers between the cells. DarkGray, not LightGray: LightGray
-    // inks only x%2==0 && y%2==0, so a one-pixel column of it is every fourth
-    // pixel and effectively invisible.
-    if (i > 0) {
-      renderer.fillRectDither(cellsX + i * cellWidth, boxY + STATS_PADDING, 1, boxH - 2 * STATS_PADDING,
-                              Color::DarkGray);
-    }
+    const int cellX = innerLeft + i * cellWidth;
+    char line[40];
+    snprintf(line, sizeof(line), "%s %s", labels[i], values[i]);
+    renderer.drawText(SMALL_FONT_ID, cellX, statsY, renderer.truncatedText(SMALL_FONT_ID, line, cellWidth - 4).c_str());
   }
 }
 
