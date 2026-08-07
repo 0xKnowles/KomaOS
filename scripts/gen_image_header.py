@@ -1,7 +1,19 @@
 #!/usr/bin/env python3
-"""Convert a PNG into the packed 1-bit C header the renderer draws.
+"""Convert an image into the packed 1-bit C header the renderer draws.
+
+Basic use:
 
     python3 scripts/gen_image_header.py src/images/Logo120.png src/images/Logo120.h Logo120
+
+Taking a large logo down to the 120x120 boot slot, previewing the result:
+
+    python3 scripts/gen_image_header.py komaos-mark.png src/images/Logo120.h Logo120 \
+        --trim --size 120x120 --threshold 150 --preview /tmp/logo-preview.png
+
+Choosing a threshold without flashing anything:
+
+    python3 scripts/gen_image_header.py komaos-mark.png --contact-sheet /tmp/sheet.png \
+        --trim --size 120x120
 
 Output format (what GfxRenderer::drawImage expects):
   row-major, 8 pixels per byte, MSB = leftmost pixel, 1 = white, 0 = black ink.
@@ -17,15 +29,72 @@ import os
 import sys
 
 try:
-    from PIL import Image
+    from PIL import Image, ImageOps
 except ImportError:
     sys.exit("Pillow is required: pip install pillow")
 
-# Pixels at or above this luminance become white (bit 1); below become ink.
-THRESHOLD = 128
+DEFAULT_THRESHOLD = 128
+# Thresholds sampled by --contact-sheet, plus a dithered tile.
+SHEET_THRESHOLDS = (96, 112, 128, 144, 160, 176, 192, 208)
+PREVIEW_SCALE = 4
+
+
+def parse_size(text):
+    lowered = text.lower().replace("×", "x")
+    if "x" not in lowered:
+        raise argparse.ArgumentTypeError("size must look like 120x120")
+    width, _, height = lowered.partition("x")
+    try:
+        return int(width), int(height)
+    except ValueError:
+        raise argparse.ArgumentTypeError("size must look like 120x120")
+
+
+def load(path, trim, size):
+    """Load an image as 8-bit grayscale, optionally trimmed and resized."""
+    image = Image.open(path)
+
+    # Flatten alpha onto white first: an RGBA logo converted straight to "L"
+    # gives transparent pixels a value of 0 and the whole background turns black.
+    if image.mode in ("RGBA", "LA", "PA"):
+        flattened = Image.new("RGBA", image.size, (255, 255, 255, 255))
+        flattened.paste(image, mask=image.convert("RGBA").split()[-1])
+        image = flattened
+    image = image.convert("L")
+
+    if trim:
+        # getbbox() finds non-zero pixels, so invert to make the white border
+        # the zero region we want to crop away.
+        bbox = ImageOps.invert(image).getbbox()
+        if bbox:
+            image = image.crop(bbox)
+
+    if size:
+        target_w, target_h = size
+        # Preserve aspect ratio and pad with white, rather than distorting a
+        # logo to fit a square slot.
+        fitted = ImageOps.contain(image, (target_w, target_h), Image.LANCZOS)
+        canvas = Image.new("L", (target_w, target_h), 255)
+        canvas.paste(fitted, ((target_w - fitted.width) // 2, (target_h - fitted.height) // 2))
+        image = canvas
+
+    return image
+
+
+def to_bilevel(image, threshold, dither, invert):
+    """Reduce grayscale to a 0/255 image using the requested method."""
+    if invert:
+        image = ImageOps.invert(image)
+
+    if dither:
+        # Pillow's "1" conversion uses Floyd-Steinberg by default.
+        return image.convert("1").convert("L")
+
+    return image.point(lambda value: 255 if value >= threshold else 0, mode="L")
 
 
 def pack(image):
+    """Pack a 0/255 image into the renderer's 1-bit layout."""
     width, height = image.size
     row_bytes = (width + 7) // 8
     # Pad bits default to 1 (white) so a non-multiple-of-8 width does not
@@ -35,10 +104,10 @@ def pack(image):
 
     for y in range(height):
         for x in range(width):
-            if pixels[x, y] < THRESHOLD:
+            if pixels[x, y] < 128:
                 data[y * row_bytes + (x >> 3)] &= ~(1 << (7 - (x & 7))) & 0xFF
 
-    return data, row_bytes
+    return data
 
 
 def emit(name, width, height, data, per_line=19):
@@ -58,30 +127,101 @@ def emit(name, width, height, data, per_line=19):
     return "\n".join(lines) + "\n"
 
 
+def label_tile(tile, text):
+    """Stack a caption strip under a preview tile."""
+    from PIL import ImageDraw
+
+    strip = 14
+    canvas = Image.new("L", (tile.width, tile.height + strip), 255)
+    canvas.paste(tile, (0, 0))
+    ImageDraw.Draw(canvas).text((2, tile.height + 2), text, fill=0)
+    return canvas
+
+
+def write_preview(bilevel, path):
+    """Write the packed result at both polarities, upscaled to be inspectable.
+
+    The sleep screen calls invertScreen() (SleepActivity.cpp), so a mark that
+    only reads one way is only half done.
+    """
+    scale = PREVIEW_SCALE
+    normal = bilevel.resize((bilevel.width * scale, bilevel.height * scale), Image.NEAREST)
+    inverted = ImageOps.invert(normal)
+
+    gap = 12
+    sheet = Image.new("L", (normal.width * 2 + gap * 3, normal.height + gap * 2 + 14), 200)
+    sheet.paste(label_tile(normal, "boot (ink on white)"), (gap, gap))
+    sheet.paste(label_tile(inverted, "sleep (inverted)"), (gap * 2 + normal.width, gap))
+    sheet.save(path)
+
+
+def write_contact_sheet(gray, invert, path):
+    """Render the same source at a range of thresholds, plus dithered."""
+    scale = 2
+    tiles = []
+    for threshold in SHEET_THRESHOLDS:
+        tile = to_bilevel(gray, threshold, False, invert)
+        tiles.append((tile, f"thr {threshold}"))
+    tiles.append((to_bilevel(gray, 0, True, invert), "dither"))
+
+    cols = 3
+    rows = (len(tiles) + cols - 1) // cols
+    tile_w = gray.width * scale
+    tile_h = gray.height * scale + 14
+    gap = 10
+
+    sheet = Image.new("L", (cols * tile_w + (cols + 1) * gap, rows * tile_h + (rows + 1) * gap), 200)
+    for index, (tile, caption) in enumerate(tiles):
+        scaled = tile.resize((tile_w, gray.height * scale), Image.NEAREST)
+        col, row = index % cols, index // cols
+        sheet.paste(label_tile(scaled, caption),
+                    (gap + col * (tile_w + gap), gap + row * (tile_h + gap)))
+    sheet.save(path)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("source", help="input PNG")
-    parser.add_argument("output", help="output .h path")
+    parser.add_argument("source", help="input image (PNG, JPEG, ...)")
+    parser.add_argument("output", nargs="?", help="output .h path (omit when only previewing)")
     parser.add_argument("name", nargs="?", help="C array name (default: output basename)")
+    parser.add_argument("--size", type=parse_size,
+                        help="resize to WxH, preserving aspect ratio and padding with white")
+    parser.add_argument("--trim", action="store_true", help="crop a uniform white border first")
+    parser.add_argument("--threshold", type=int, default=DEFAULT_THRESHOLD,
+                        help=f"luminance cutoff, 0-255 (default {DEFAULT_THRESHOLD})")
+    parser.add_argument("--dither", action="store_true",
+                        help="Floyd-Steinberg instead of a hard threshold")
+    parser.add_argument("--invert", action="store_true", help="swap ink and paper")
+    parser.add_argument("--preview", metavar="PATH.png",
+                        help="write an upscaled preview of the result, normal and inverted")
+    parser.add_argument("--contact-sheet", metavar="PATH.png",
+                        help="write a grid of threshold candidates and exit without emitting a header")
     args = parser.parse_args()
 
+    gray = load(args.source, args.trim, args.size)
+
+    if args.contact_sheet:
+        write_contact_sheet(gray, args.invert, args.contact_sheet)
+        print(f"{args.contact_sheet}: {len(SHEET_THRESHOLDS)} thresholds + dither at {gray.width}x{gray.height}")
+        if not args.output:
+            return
+
+    bilevel = to_bilevel(gray, args.threshold, args.dither, args.invert)
+
+    if args.preview:
+        write_preview(bilevel, args.preview)
+        print(f"{args.preview}: preview at {PREVIEW_SCALE}x, both polarities")
+
+    if not args.output:
+        return
+
     name = args.name or os.path.splitext(os.path.basename(args.output))[0]
-
-    image = Image.open(args.source)
-    # Flatten alpha onto white first: an RGBA logo converted straight to "L"
-    # gives transparent pixels a value of 0 and the whole background turns black.
-    if image.mode in ("RGBA", "LA", "PA"):
-        flattened = Image.new("RGBA", image.size, (255, 255, 255, 255))
-        flattened.paste(image, mask=image.convert("RGBA").split()[-1])
-        image = flattened
-    image = image.convert("L")
-
-    data, row_bytes = pack(image)
+    data = pack(bilevel)
     with open(args.output, "w", encoding="utf-8") as fh:
-        fh.write(emit(name, image.width, image.height, data))
+        fh.write(emit(name, bilevel.width, bilevel.height, data))
 
-    print(f"{args.output}: {name}[{len(data)}] ({image.width}x{image.height}, {row_bytes} bytes/row)")
+    print(f"{args.output}: {name}[{len(data)}] ({bilevel.width}x{bilevel.height})")
 
 
 if __name__ == "__main__":
