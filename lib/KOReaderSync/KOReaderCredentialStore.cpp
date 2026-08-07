@@ -5,7 +5,7 @@
 #include <ObfuscationUtils.h>
 
 namespace {
-// Default sync server URL. crosspoint-sync speaks the full KOSync protocol, so
+// Default sync server URL. komaos-sync speaks the full KOSync protocol, so
 // pointing at any other kosync server (e.g. https://sync.koreader.rocks:443)
 // still works via the custom server URL setting.
 constexpr char DEFAULT_SERVER_URL[] = "https://sync.crosspointreader.com";
@@ -37,7 +37,7 @@ bool KOReaderCredentialStore::fromJson(JsonVariantConst doc) {
   setCredentials(user, pass);
   setServerUrl(doc["serverUrl"] | "");
 
-  // The default server changed in config v2 (sync.koreader.rocks -> crosspoint-sync).
+  // The default server changed in config v2 (sync.koreader.rocks -> komaos-sync).
   // A pre-v2 config with credentials and no explicit URL was actively syncing
   // against the old default — pin that URL so the upgrade doesn't switch servers
   // out from under the user. Fresh setups get the new default.
@@ -132,7 +132,7 @@ std::string KOReaderCredentialStore::getBaseUrl() const {
   return url;
 }
 
-bool KOReaderCredentialStore::usesCrossPointSyncServer() const { return getBaseUrl() == DEFAULT_SERVER_URL; }
+bool KOReaderCredentialStore::usesKomaSyncServer() const { return getBaseUrl() == DEFAULT_SERVER_URL; }
 
 void KOReaderCredentialStore::setMatchMethod(DocumentMatchMethod method) {
   matchMethod = method;

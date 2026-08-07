@@ -8,7 +8,7 @@ target_include_directories(Utf8ComposeTest PRIVATE
 )
 
 target_link_libraries(Utf8ComposeTest PRIVATE
-  crosspoint_test_common
+  komaos_test_common
   GTest::gtest_main
 )
 

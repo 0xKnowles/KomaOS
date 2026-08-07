@@ -12,7 +12,7 @@ target_include_directories(MiniBidiArabicTest PRIVATE
 )
 
 target_link_libraries(MiniBidiArabicTest PRIVATE
-  crosspoint_test_common
+  komaos_test_common
   GTest::gtest_main
 )
 

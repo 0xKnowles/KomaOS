@@ -68,7 +68,7 @@ void syncTimeWithNTP() {
 void KOReaderSyncActivity::ensureEpubLoaded() {
   if (!epub) {
     LOG_DBG("KOSync", "Loading epub for progress mapping (heap: %u)", (unsigned)ESP.getFreeHeap());
-    epub = std::make_shared<Epub>(epubPath, "/.crosspoint");
+    epub = std::make_shared<Epub>(epubPath, "/.komaos");
     epub->setupCacheDir();
     // Load metadata only (no CSS needed for progress mapping, don't rebuild if cache is missing).
     if (!epub->load(false, true)) {
@@ -237,11 +237,11 @@ void KOReaderSyncActivity::performSync() {
   }
 
   // The standard KOReader progress XPath is the authoritative content anchor.
-  // The CrossPoint server's existing rich page hints remain a legacy fallback.
+  // The KomaOS server's existing rich page hints remain a legacy fallback.
   SavedProgressPosition koPos = {remoteProgress.progress, remoteProgress.percentage};
-  remotePosition = ProgressMapper::toCrossPoint(epub, koPos, renderer, currentSpineIndex, totalPagesInSpine);
+  remotePosition = ProgressMapper::toKomaOS(epub, koPos, renderer, currentSpineIndex, totalPagesInSpine);
   if (!remotePosition.hasVisibleTextOffset && remoteProgress.position.has_value()) {
-    // toCrossPoint above already tried koPos.xpath; if the rich position carries the same XPath,
+    // toKomaOS above already tried koPos.xpath; if the rich position carries the same XPath,
     // tell fromRichPosition to skip re-resolving it and use its page hints directly.
     const bool sameXPath = remoteProgress.position->xpath == remoteProgress.progress;
     if (const auto richMapped = ProgressMapper::fromRichPosition(epub, *remoteProgress.position, renderer, sameXPath)) {
@@ -301,10 +301,10 @@ void KOReaderSyncActivity::performUpload() {
   progress.progress = localProgress.xpath;
   progress.percentage = localProgress.percentage;
 
-  // Rich CrossPoint position for the default CrossPoint sync server (lossless
-  // CrossPoint<->CrossPoint sync). The HTTP client also enforces this boundary
+  // Rich KomaOS position for the default KomaOS sync server (lossless
+  // KomaOS<->KomaOS sync). The HTTP client also enforces this boundary
   // before serializing the extension.
-  if (KOREADER_STORE.usesCrossPointSyncServer()) {
+  if (KOREADER_STORE.usesKomaSyncServer()) {
     KOReaderRichPosition pos;
     const float pct = localProgress.percentage < 0.0f   ? 0.0f
                       : localProgress.percentage > 1.0f ? 1.0f

@@ -1,5 +1,5 @@
 {
-  description = "CrossPoint Reader development environment";
+  description = "KomaOS development environment";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -30,7 +30,7 @@
             export PLATFORMIO_CORE_DIR="$PROJECT_ROOT/.cache/platformio"
           '';
           fhsEnv = pkgs.buildFHSEnv {
-            name = "crosspoint-reader-shell";
+            name = "komaos-shell";
 
             targetPkgs =
               pkgs: with pkgs; [
@@ -61,7 +61,7 @@
             '';
           };
           pio = pkgs.writeShellScriptBin "pio" ''
-            exec ${fhsEnv}/bin/crosspoint-reader-shell -c 'exec pio "$@"' pio "$@"
+            exec ${fhsEnv}/bin/komaos-shell -c 'exec pio "$@"' pio "$@"
           '';
         in
         {

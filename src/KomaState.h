@@ -5,10 +5,10 @@
 #include <cstdint>
 #include <string>
 
-class CrossPointState : public PersistableStore<CrossPointState> {
-  CrossPointState() = default;
+class KomaState : public PersistableStore<KomaState> {
+  KomaState() = default;
 
-  friend class PersistableStore<CrossPointState>;
+  friend class PersistableStore<KomaState>;
 
  public:
   static constexpr uint8_t SLEEP_RECENT_COUNT = 16;
@@ -21,7 +21,7 @@ class CrossPointState : public PersistableStore<CrossPointState> {
   bool lastSleepFromReader = false;
   bool showBootScreen = true;
 
-  static const char* getFilePath() { return "/.crosspoint/state.json"; }
+  static const char* getFilePath() { return "/.komaos/state.json"; }
   void toJson(JsonDocument& doc) const;
   bool fromJson(JsonVariantConst doc);
 
@@ -33,4 +33,4 @@ class CrossPointState : public PersistableStore<CrossPointState> {
 };
 
 // Helper macro to access state
-#define APP_STATE CrossPointState::getInstance()
+#define APP_STATE KomaState::getInstance()

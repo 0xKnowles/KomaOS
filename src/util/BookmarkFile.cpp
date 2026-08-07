@@ -56,7 +56,7 @@ bool BookmarkFile::save(const std::string& bookPath, const std::vector<BookmarkE
     }
   }
 
-  // writeDocToFile ensures /.crosspoint; the bookmarks subdirectory is ours.
+  // writeDocToFile ensures /.komaos; the bookmarks subdirectory is ours.
   Storage.mkdir(BookmarkUtil::getBookmarksDir().c_str());
   const std::string path = BookmarkUtil::getBookmarkPath(bookPath);
   return PersistableStoreBase::writeDocToFile(path.c_str(), doc);

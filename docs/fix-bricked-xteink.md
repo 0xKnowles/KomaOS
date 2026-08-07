@@ -2,7 +2,7 @@
 
 ![proceed at your own risk](./images/spiflash/fix_bricked.jpg)
 
-This guide covers installing CrossPoint on an Xteink that's bricked, or stuck on firmware with no path to flash a replacement. It works by writing firmware directly to the SPI flash chip with an external programmer, bypassing the ESP32-C3 entirely.
+This guide covers installing KomaOS on an Xteink that's bricked, or stuck on firmware with no path to flash a replacement. It works by writing firmware directly to the SPI flash chip with an external programmer, bypassing the ESP32-C3 entirely.
 
 If your device isn't USB-locked, flash it over USB instead — it's safer and much less invasive. What follows should only be a last resort.
 
@@ -30,13 +30,13 @@ If your device isn't USB-locked, flash it over USB instead — it's safer and mu
 
 Two options:
 
-- Use the backup provided by @Uri-Tauber at `crosspoint-reader/docs/images/spiflash/crosspoint_spiflash_backup.tar.xz`, and extract the `.bin` file.
+- Use the backup provided by @Uri-Tauber at `komaos/docs/images/spiflash/komaos_spiflash_backup.tar.xz`, and extract the `.bin` file.
 - Dump one yourself from a working, unlocked device over USB:
     - Turn the device on, connect the USB cable and do:
     ```bash
-    ~$ pio pkg exec -p tool-esptoolpy -- esptool.py --chip esp32c3 -p /dev/ttyACM0 -b 921600 read_flash 0x000000     0x1000000 crosspoint_backup.bin
+    ~$ pio pkg exec -p tool-esptoolpy -- esptool.py --chip esp32c3 -p /dev/ttyACM0 -b 921600 read_flash 0x000000     0x1000000 komaos_backup.bin
      # or
-    ~$ esptool.py --chip esp32c3 -p /dev/ttyACM0 -b 921600 read_flash 0x000000 0x1000000 crosspoint_backup.bin
+    ~$ esptool.py --chip esp32c3 -p /dev/ttyACM0 -b 921600 read_flash 0x000000 0x1000000 komaos_backup.bin
     ```
 
 ### 2. Disconnect Power Sources and Accessories
@@ -107,7 +107,7 @@ Read the chip twice and compare hashes. If they don't match, something in the cl
 ### 9. Flash the Chip
 
 ```bash
-~$ sudo flashrom --programmer ch341a_spi -w crosspoint_backup.bin
+~$ sudo flashrom --programmer ch341a_spi -w komaos_backup.bin
     [...]
     Reading old flash chip contents... done.
     Erasing and writing flash chip... Erase/write done.
@@ -127,5 +127,5 @@ Read the chip twice and compare hashes. If they don't match, something in the cl
 ![success 0](./images/spiflash/success_0.jpg)
 ![success 1](./images/spiflash/success_1.jpg)
 
-If CrossPoint boots successfully, the device can be fully reassembled.
+If KomaOS boots successfully, the device can be fully reassembled.
 

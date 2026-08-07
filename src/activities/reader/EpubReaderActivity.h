@@ -221,5 +221,5 @@ class EpubReaderActivity final : public Activity {
     return true;
   }
   ScreenshotInfo getScreenshotInfo() const override;
-  CrossPointPosition getCurrentPosition() const;
+  KomaPosition getCurrentPosition() const;
 };

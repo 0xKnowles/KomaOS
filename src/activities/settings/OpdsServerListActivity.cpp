@@ -5,7 +5,7 @@
 
 #include <cstring>
 
-#include "CrossPointSettings.h"
+#include "KomaSettings.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
 #include "OpdsSettingsActivity.h"

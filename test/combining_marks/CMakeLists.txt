@@ -7,7 +7,7 @@ target_include_directories(CombiningMarkAnchorTest PRIVATE
 )
 
 target_link_libraries(CombiningMarkAnchorTest PRIVATE
-  crosspoint_test_common
+  komaos_test_common
   GTest::gtest_main
 )
 

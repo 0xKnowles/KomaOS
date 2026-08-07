@@ -1,14 +1,56 @@
-# CrossPoint Reader Roadmap
+# KomaOS Roadmap
 
-This roadmap describes how CrossPoint is moving through the tighter scope defined in [SCOPE.md](SCOPE.md). It is
-intentionally phased: Phase 0 closed out the commitments already in flight before locking down to the stricter
-"fill gaps the stock firmware leaves" delineator.
+KomaOS has two roadmaps running side by side.
 
-Phases are sequential. We do not start the next phase until the prior one is wrapped or explicitly carried over.
+**The manga track (Phase M)** is the reason this fork exists and is where new work goes.
+
+**The inherited track (Phases 0-2)** is CrossPoint Reader's roadmap, kept below so upstream merges stay
+legible and so contributors know which upstream commitments still hold. We follow upstream's phasing there
+rather than re-litigating it.
 
 ---
 
-## Phase 0 - Close Out Legacy Scope Items — **COMPLETE**
+## Phase M - Manga Reading — **IN PROGRESS**
+
+**Goal:** make a converted volume as good to read as an EPUB already is, without breaking the 380KB ceiling.
+
+**Ground rule:** decoding happens off-device. The device reads pre-rendered XTC/XTCH pages; CBZ/CBR
+conversion belongs in [FlipNzb](https://github.com/0xKnowles/FlipNzb) or
+[xtcjs](https://github.com/varo6/xtcjs), where there is RAM to dither properly. See
+[SCOPE.md §1a](SCOPE.md).
+
+### M1 - Reading a volume
+
+* **Right-to-left page order**, per book, persisted with progress. The single highest-value change: most
+  manga is drawn for it, and it is a page-index transform plus a settings flag, not a rendering change.
+* **Strip-aware navigation.** A page in a converted volume is one of N overlapping strips of a source page.
+  Surface that: jump by source page, not just by strip.
+* **Two-page spread detection** from the XTC index (a page roughly twice the usual width is a spread) and
+  a landscape layout for it.
+* **Fit modes** — fit-width / fit-height / fill — for volumes converted at a resolution that does not match
+  the panel.
+
+### M2 - The library
+
+* **Series shelf.** Group `Series vNN` files into one entry, resume at the right volume, offer the next
+  volume at the end of one instead of dumping back to the file browser.
+* **Volume covers** from the XTC first page, cached like EPUB covers already are.
+* **Continue reading** across a series, not just within a file.
+
+### M3 - The pipeline
+
+* **XTC metadata round-trip** — series, volume number and TOC written by the converter, read and shown here.
+* **On-device CBZ** for stored (uncompressed) archives, as a fallback when no XTC exists. Explicitly a
+  convenience path, not the main one.
+* **Wireless push from FlipNzb** to the device's existing upload endpoint, so a converted volume lands
+  without touching the SD card.
+
+Nothing in Phase M is committed until it has a heap budget written down. "It would be nice on a Kindle"
+is not an argument on a device with one 48KB framebuffer.
+
+---
+
+## Phase 0 - Close Out Legacy Scope Items — **COMPLETE** *(inherited from CrossPoint Reader)*
 
 **Goal:** Land the work that was already in motion under the prior, broader scope so contributors are not left
 hanging, and so we enter the stricter phases with a clean slate.
@@ -28,7 +70,7 @@ is not a valid argument for accepting a PR.
 ## Phase 1 - Consolidation, Footprint, and Multi-Device Support — **IN PROGRESS**
 
 **Goal:** Reduce memory and flash usage, clean up the codebase, and land the SDK / HAL generalization work so
-CrossPoint runs cleanly on ESP32-based e-reader hardware beyond Xteink (X3 / X4), including ESP32-S3 class devices.
+KomaOS runs cleanly on ESP32-based e-reader hardware beyond Xteink (X3 / X4), including ESP32-S3 class devices.
 
 **Focus areas:**
 
@@ -69,7 +111,7 @@ This phase depends on Phase 1 cleanup landing first; otherwise we generalize a m
 
 ## Out of Roadmap
 
-The following are explicitly *not* on the roadmap. They may live in other CrossPoint forks; they will not be picked
+The following are explicitly *not* on the roadmap. They may live in other KomaOS forks; they will not be picked
 up here:
 
 * Interactive apps (games, calculators, notepads).

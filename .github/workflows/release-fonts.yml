@@ -2,7 +2,7 @@ name: Build & Publish SD Card Fonts
 
 # Fonts change rarely — run manually when font sources or the conversion
 # pipeline are updated.  Publishes .cpfont files + fonts.json manifest as
-# GitHub Release assets on the crosspoint-fonts repo so font releases don't
+# GitHub Release assets on the komaos-fonts repo so font releases don't
 # clutter the firmware releases page.
 #
 # Requires a repository secret FONTS_REPO_TOKEN — a fine-grained PAT (or
@@ -81,7 +81,7 @@ jobs:
           gh release create "$VERSIONED" dist/* \
             --repo "${{ env.FONTS_REPO }}" \
             --title "$TITLE" \
-            --notes "Pre-built \`.cpfont\` font files for CrossPoint Reader.
+            --notes "Pre-built \`.cpfont\` font files for KomaOS.
 
           Download individual files or use **Settings > System > Manage Fonts** on the device.
 

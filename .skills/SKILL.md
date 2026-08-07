@@ -1,7 +1,12 @@
-# CrossPoint Reader Development Guide
+# KomaOS Development Guide
 
-Project: Open-source e-reader firmware for Xteink X4 (ESP32-C3)
-Mission: Provide a lightweight, high-performance reading experience focused on EPUB rendering on constrained hardware.
+Project: Open-source e-reader firmware for Xteink X4 (ESP32-C3). A manga-focused fork of CrossPoint Reader.
+Mission: Provide a lightweight, high-performance reading experience on constrained hardware, for manga (XTC/XTCH paged images) first and EPUB text second.
+
+Manga-specific note: the ESP32-C3 cannot decode a full-resolution JPEG page per turn within the RAM
+budget, so KomaOS reads *pre-rendered* pages (XTC/XTCH) and does the expensive image work off-device
+(FlipNzb, xtcjs). Any proposal that decodes arbitrary images per page turn must justify itself against
+the 48KB framebuffer and the ~380KB ceiling before anything else.
 
 ## AI Agent Identity and Cognitive Rules
 * Role: Senior Embedded Systems Engineer (ESP-IDF/Arduino-ESP32 specialized).
@@ -128,7 +133,7 @@ These flags in `platformio.ini` fundamentally affect firmware behavior:
   * lib/I18n/: Internationalization (translations in `translations/*.yaml`, generated string tables)
 * src/activities/: UI logic using the Activity Lifecycle (onEnter, loop, onExit)
 * freeink-sdk/: Low-level SDK (EInkDisplay, InputManager, BatteryMonitor, SDCardManager)
-* .crosspoint/: SD-based binary cache for EPUB metadata and pre-rendered layout sections
+* .komaos/: SD-based binary cache for EPUB metadata and pre-rendered layout sections
 
 ### Hardware Abstraction Layer (HAL)
 
@@ -393,8 +398,8 @@ Constraint: Physical button positions are fixed on hardware, but their logical f
 ### Singleton Access
 **Available Singletons**:
 ```cpp
-#define SETTINGS CrossPointSettings::getInstance()  // User settings
-#define APP_STATE CrossPointState::getInstance()    // Runtime state
+#define SETTINGS KomaSettings::getInstance()  // User settings
+#define APP_STATE KomaState::getInstance()    // Runtime state
 #define GUI UITheme::getInstance()                   // Current theme
 #define Storage HalStorage::getInstance()            // SD card I/O
 #define I18N I18n::getInstance()                     // Internationalization
@@ -564,7 +569,7 @@ clang-format -i src/**/*.cpp src/**/*.h
    - Set pointers to `nullptr` after `free()`
 
 4. **Corrupt Cache Files**:
-   - Delete `.crosspoint/` directory on SD card
+   - Delete `.komaos/` directory on SD card
    - Forces clean re-parse of all EPUBs
    - Check file format versions in [docs/file-formats.md](../docs/file-formats.md)
 
@@ -607,8 +612,8 @@ git status --short
 
 **Example Output** (forked repository):
 ```text
-origin      https://github.com/<your-username>/crosspoint-reader.git (fetch/push)
-upstream    https://github.com/crosspoint-reader/crosspoint-reader.git (fetch/push)
+origin      https://github.com/<your-username>/komaos.git (fetch/push)
+upstream    https://github.com/0xKnowles/KomaOS.git (fetch/push)
 ```
 
 ### Git Operation Rules
@@ -804,7 +809,7 @@ build_flags =
 6. 🔲 **Device**: Test on hardware
 7. 🔲 **Orientations**: Verify all 4 modes (Portrait/Inverted/Landscape CW/CCW)
 8. 🔲 **Heap**: `ESP.getFreeHeap()` > 50KB, no leaks
-9. 🔲 **Cache**: If EPUB modified, delete `.crosspoint/` and verify re-parse
+9. 🔲 **Cache**: If EPUB modified, delete `.komaos/` and verify re-parse
 
 ### CI/CD Pipeline Awareness
 
@@ -847,9 +852,9 @@ build_flags =
 
 ### Cache Structure on SD Card
 
-**Location**: `.crosspoint/` directory on SD card root
+**Location**: `.komaos/` directory on SD card root
 
-**Structure**: `.crosspoint/epub_<hash>/{book.bin, progress.bin, cover.bmp, sections/*.bin}`
+**Structure**: `.komaos/epub_<hash>/{book.bin, progress.bin, cover.bmp, sections/*.bin}`
 
 **Hash**: `std::hash<std::string>{}(filepath)` → Moving/renaming file = new hash = lost progress
 
@@ -873,13 +878,13 @@ build_flags =
 **Manual Cache Clear** (safe operations):
 ```bash
 # Delete ALL caches (forces full regeneration)
-rm -rf /path/to/sd/.crosspoint/
+rm -rf /path/to/sd/.komaos/
 
 # Delete specific book cache
-rm -rf /path/to/sd/.crosspoint/epub_<hash>/
+rm -rf /path/to/sd/.komaos/epub_<hash>/
 
 # Keep progress, delete only rendered sections
-rm -rf /path/to/sd/.crosspoint/epub_<hash>/sections/
+rm -rf /path/to/sd/.komaos/epub_<hash>/sections/
 ```
 
 **When to Clear Cache**:
@@ -889,7 +894,7 @@ rm -rf /path/to/sd/.crosspoint/epub_<hash>/sections/
 - After modifying:
   - `lib/Epub/Epub/Section.cpp`
   - `lib/Epub/Epub/BookMetadataCache.cpp`
-  - Render settings in `CrossPointSettings`
+  - Render settings in `KomaSettings`
 
 ### Cache File Format Versioning
 

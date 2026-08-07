@@ -9,7 +9,7 @@ target_include_directories(ReleaseJsonParserTest PRIVATE
 )
 
 target_link_libraries(ReleaseJsonParserTest PRIVATE
-  crosspoint_test_common
+  komaos_test_common
   GTest::gtest_main
 )
 

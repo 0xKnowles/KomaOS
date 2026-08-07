@@ -16,7 +16,7 @@
 
 #ifndef FONT_MANIFEST_URL
 // Manifest + .cpfont assets are published by .github/workflows/release-fonts.yml
-// to the crosspoint-fonts repo under the "sd-fonts-m<META>-b<BIN>" tag. The tag
+// to the komaos-fonts repo under the "sd-fonts-m<META>-b<BIN>" tag. The tag
 // pattern must stay in sync with the workflow; it derives its version numbers
 // from lib/EpdFont/scripts/cpfont_version.py.
 #define FONT_MANIFEST_URL_STRINGIFY_INNER(x) #x

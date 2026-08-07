@@ -17,7 +17,7 @@ struct FileInfo {
   bool isDirectory;
 };
 
-class CrossPointWebServer {
+class KomaWebServer {
  public:
   struct WsUploadStatus {
     bool inProgress = false;
@@ -48,8 +48,8 @@ class CrossPointWebServer {
     UploadState() { buffer.resize(UPLOAD_BUFFER_SIZE); }
   } upload;
 
-  CrossPointWebServer();
-  ~CrossPointWebServer();
+  KomaWebServer();
+  ~KomaWebServer();
 
   // Start the web server (call after WiFi is connected)
   void begin();

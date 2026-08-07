@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <cstdio>
 
-#include "CrossPointSettings.h"
+#include "KomaSettings.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/HtmlToPlainText.h"

@@ -7,7 +7,7 @@
 
 #include <optional>
 
-#include "CrossPointSettings.h"
+#include "KomaSettings.h"
 #include "Epub.h"
 #include "EpubReaderActivity.h"
 #include "SdCardFontSystem.h"
@@ -41,7 +41,7 @@ std::unique_ptr<Epub> ReaderActivity::loadEpub(const std::string& path) {
     return nullptr;
   }
 
-  auto epub = makeUniqueNoThrow<Epub>(path, "/.crosspoint");
+  auto epub = makeUniqueNoThrow<Epub>(path, "/.komaos");
   if (!epub) {
     LOG_ERR("READER", "Failed to allocate EPUB object");
     return nullptr;
@@ -78,7 +78,7 @@ std::unique_ptr<Xtc> ReaderActivity::loadXtc(const std::string& path) {
     return nullptr;
   }
 
-  auto xtc = makeUniqueNoThrow<Xtc>(path, "/.crosspoint");
+  auto xtc = makeUniqueNoThrow<Xtc>(path, "/.komaos");
   if (!xtc) {
     LOG_ERR("READER", "Failed to allocate XTC object");
     return nullptr;
@@ -97,7 +97,7 @@ std::unique_ptr<Txt> ReaderActivity::loadTxt(const std::string& path) {
     return nullptr;
   }
 
-  auto txt = makeUniqueNoThrow<Txt>(path, "/.crosspoint");
+  auto txt = makeUniqueNoThrow<Txt>(path, "/.komaos");
   if (!txt) {
     LOG_ERR("READER", "Failed to allocate TXT object");
     return nullptr;

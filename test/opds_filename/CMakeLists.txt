@@ -11,7 +11,7 @@ target_include_directories(OpdsFilenameTest PRIVATE
 )
 
 target_link_libraries(OpdsFilenameTest PRIVATE
-  crosspoint_test_common
+  komaos_test_common
   GTest::gtest_main
 )
 

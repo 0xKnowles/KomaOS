@@ -5,12 +5,12 @@
 
 #include <cstdint>
 
-class CrossPointSettings : public PersistableStore<CrossPointSettings> {
+class KomaSettings : public PersistableStore<KomaSettings> {
  private:
   // Private constructor for singleton
-  CrossPointSettings() = default;
+  KomaSettings() = default;
 
-  friend class PersistableStore<CrossPointSettings>;
+  friend class PersistableStore<KomaSettings>;
 
  public:
   enum SLEEP_SCREEN_MODE {
@@ -292,7 +292,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   void* sdFontResolverCtx = nullptr;
 
   uint16_t getPowerButtonDuration() const {
-    return (shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::SLEEP) ? 10 : 400;
+    return (shortPwrBtn == KomaSettings::SHORT_PWRBTN::SLEEP) ? 10 : 400;
   }
   int getReaderFontId() const;
 
@@ -342,11 +342,11 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Unlocked for the same reason as statusBarSpec(); see the note above.
   ReaderRenderSpec readerRenderSpec(uint16_t viewportWidth, uint16_t viewportHeight) const;
 
-  static const char* getFilePath() { return "/.crosspoint/settings.json"; }
+  static const char* getFilePath() { return "/.komaos/settings.json"; }
   void toJson(JsonDocument& doc) const;
   bool fromJson(JsonVariantConst doc);
 
-  static void validateFrontButtonMapping(CrossPointSettings& settings);
+  static void validateFrontButtonMapping(KomaSettings& settings);
   static uint8_t sleepTimeoutEnumToMinutes(uint8_t legacyValue);
 
   float getReaderLineCompression() const;
@@ -355,4 +355,4 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
 };
 
 // Helper macro to access settings
-#define SETTINGS CrossPointSettings::getInstance()
+#define SETTINGS KomaSettings::getInstance()

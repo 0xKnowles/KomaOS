@@ -3,7 +3,7 @@ add_executable(CredentialIntegrityTest
 )
 
 target_link_libraries(CredentialIntegrityTest PRIVATE
-  crosspoint_test_common
+  komaos_test_common
   GTest::gtest_main
 )
 

@@ -15,8 +15,8 @@ struct KOReaderMetadata {
 };
 
 /**
- * Rich CrossPoint position sent alongside progress uploads. Maps 1:1 onto the
- * crosspoint-sync extended `position` object (see crosspoint-sync docs/API.md).
+ * Rich KomaOS position sent alongside progress uploads. Maps 1:1 onto the
+ * komaos-sync extended `position` object (see komaos-sync docs/API.md).
  * It is only transmitted to sync.crosspointreader.com. These fields remain
  * layout-dependent compatibility hints; the standard XPath is the content anchor.
  */
@@ -40,7 +40,7 @@ struct KOReaderProgress {
   std::string deviceId;                          // Device ID
   int64_t timestamp;                             // Unix timestamp of last update
   std::optional<KOReaderMetadata> metadata;      // Optional document metadata
-  std::optional<KOReaderRichPosition> position;  // Optional rich position (crosspoint-sync servers only)
+  std::optional<KOReaderRichPosition> position;  // Optional rich position (komaos-sync servers only)
 };
 
 /**
