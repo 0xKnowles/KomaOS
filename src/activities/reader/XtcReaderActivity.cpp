@@ -172,6 +172,17 @@ void XtcReaderActivity::onReaderMenuConfirm(const int action) {
                              [this](const ActivityResult&) { requestUpdate(); });
       break;
 
+    case XtcReaderMenuActivity::MenuAction::TOGGLE_VIEW_MODE:
+      SETTINGS.mangaViewMode = SETTINGS.mangaViewMode == KomaSettings::MANGA_VIEW_MODE::MANGA_VIEW_FULL
+                                   ? KomaSettings::MANGA_VIEW_MODE::MANGA_VIEW_SPLIT
+                                   : KomaSettings::MANGA_VIEW_MODE::MANGA_VIEW_FULL;
+      SETTINGS.saveToFile();
+      // Snap to the group's first strip. Switching to Full from the middle of a
+      // page would otherwise reassemble starting at whichever strip was on
+      // screen, splicing in the next page.
+      currentPage = pageGroupStart();
+      break;
+
     case XtcReaderMenuActivity::MenuAction::SCREENSHOT:
       ScreenshotUtil::takeScreenshot(renderer);
       break;

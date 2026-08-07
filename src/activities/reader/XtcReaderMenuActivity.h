@@ -27,6 +27,7 @@ class XtcReaderMenuActivity final : public Activity {
     TOGGLE_BOOKMARK,
     SELECT_CHAPTER,
     MANGA_SETTINGS,
+    TOGGLE_VIEW_MODE,
     ROTATE_SCREEN,
     SCREENSHOT,
     GO_HOME,

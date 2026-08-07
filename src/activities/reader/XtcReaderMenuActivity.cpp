@@ -7,6 +7,7 @@
 #include <string>
 #include <utility>
 
+#include "KomaSettings.h"
 #include "MappedInputManager.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -26,7 +27,7 @@ XtcReaderMenuActivity::XtcReaderMenuActivity(GfxRenderer& renderer, MappedInputM
 std::vector<XtcReaderMenuActivity::MenuItem> XtcReaderMenuActivity::buildMenuItems(const bool hasChapters,
                                                                                    const bool hasBookmarks) {
   std::vector<MenuItem> items;
-  items.reserve(8);
+  items.reserve(9);
   // Quick jump first: in a 600-strip volume it is the entry reached for most.
   items.push_back({MenuAction::QUICK_JUMP, StrId::STR_GO_TO_PAGE});
   if (hasBookmarks) {
@@ -38,6 +39,10 @@ std::vector<XtcReaderMenuActivity::MenuItem> XtcReaderMenuActivity::buildMenuIte
   if (hasChapters) {
     items.push_back({MenuAction::SELECT_CHAPTER, StrId::STR_SELECT_CHAPTER});
   }
+  // Ahead of the settings screen it also lives in: switching between reading a
+  // strip and seeing the whole page is a thing you do mid-chapter, not a
+  // preference you set once.
+  items.push_back({MenuAction::TOGGLE_VIEW_MODE, StrId::STR_MANGA_VIEW_MODE});
   items.push_back({MenuAction::MANGA_SETTINGS, StrId::STR_CAT_MANGA});
   items.push_back({MenuAction::ROTATE_SCREEN, StrId::STR_ORIENTATION});
   items.push_back({MenuAction::SCREENSHOT, StrId::STR_SCREENSHOT_BUTTON});
@@ -183,6 +188,11 @@ void XtcReaderMenuActivity::render(RenderLock&&) {
         const auto value = menuItems[index].action;
         if (value == MenuAction::ROTATE_SCREEN) {
           return I18N.get(orientationLabels[pendingOrientation]);
+        }
+        if (value == MenuAction::TOGGLE_VIEW_MODE) {
+          return I18N.get(SETTINGS.mangaViewMode == KomaSettings::MANGA_VIEW_MODE::MANGA_VIEW_FULL
+                              ? StrId::STR_MANGA_VIEW_FULL
+                              : StrId::STR_MANGA_VIEW_SPLIT);
         }
         if (value == MenuAction::TOGGLE_BOOKMARK) {
           // Shows what the page IS, not what the action will do -- the label
