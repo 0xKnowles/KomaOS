@@ -29,6 +29,9 @@ class XtcReaderActivity final : public Activity {
   // current page is bookmarked on every open, and re-reading a 258-byte file
   // for that is a pointless SD round trip.
   std::vector<uint32_t> bookmarkedPages;
+  // Set when a long-press fired its bound function, so the release that follows
+  // the hold does not also open the menu. Same guard the EPUB reader uses.
+  bool ignoreNextConfirmRelease = false;
   // Next-book suggestion menu for the End-of-Book screen
   EndOfBookOptions endOfBookOptions;
 
@@ -54,6 +57,8 @@ class XtcReaderActivity final : public Activity {
   void openReaderMenu();
   void onReaderMenuConfirm(int action);
   void toggleBookmarkForCurrentPage();
+  // Shared by the manga menu entry and the long-press binding.
+  void toggleViewMode();
   // Opens chapter selection when the book has chapters (short-press Confirm); no-op otherwise
   void openChapterSelection();
   void renderStatusBarOverlay(StatusBarOverlayPosition position) const;

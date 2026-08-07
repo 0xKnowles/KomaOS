@@ -126,6 +126,17 @@ void XtcReaderActivity::openReaderMenu() {
                          });
 }
 
+void XtcReaderActivity::toggleViewMode() {
+  SETTINGS.mangaViewMode = SETTINGS.mangaViewMode == KomaSettings::MANGA_VIEW_MODE::MANGA_VIEW_FULL
+                               ? KomaSettings::MANGA_VIEW_MODE::MANGA_VIEW_SPLIT
+                               : KomaSettings::MANGA_VIEW_MODE::MANGA_VIEW_FULL;
+  SETTINGS.saveToFile();
+  // Snap to the group's first strip. Switching to Full from the middle of a
+  // page would otherwise reassemble starting at whichever strip was on screen,
+  // splicing in the next page.
+  currentPage = pageGroupStart();
+}
+
 void XtcReaderActivity::toggleBookmarkForCurrentPage() {
   XtcBookmarks::toggle(bookmarkedPages, currentPage);
   if (!XtcBookmarks::save(xtc->getCachePath(), bookmarkedPages)) {
@@ -173,14 +184,7 @@ void XtcReaderActivity::onReaderMenuConfirm(const int action) {
       break;
 
     case XtcReaderMenuActivity::MenuAction::TOGGLE_VIEW_MODE:
-      SETTINGS.mangaViewMode = SETTINGS.mangaViewMode == KomaSettings::MANGA_VIEW_MODE::MANGA_VIEW_FULL
-                                   ? KomaSettings::MANGA_VIEW_MODE::MANGA_VIEW_SPLIT
-                                   : KomaSettings::MANGA_VIEW_MODE::MANGA_VIEW_FULL;
-      SETTINGS.saveToFile();
-      // Snap to the group's first strip. Switching to Full from the middle of a
-      // page would otherwise reassemble starting at whichever strip was on
-      // screen, splicing in the next page.
-      currentPage = pageGroupStart();
+      toggleViewMode();
       break;
 
     case XtcReaderMenuActivity::MenuAction::SCREENSHOT:
@@ -235,7 +239,28 @@ void XtcReaderActivity::loop() {
   // which returns immediately when a volume has no TOC -- so on a converted CBZ
   // without chapters, Confirm did nothing at all.
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) || ReaderUtils::isTouchMenuGesture(mappedInput)) {
+    // A long-press that already fired its bound function suppresses this
+    // release, so the hold does not also open the menu.
+    if (ignoreNextConfirmRelease) {
+      ignoreNextConfirmRelease = false;
+      return;
+    }
     openReaderMenu();
+    return;
+  }
+
+  // Long-press Confirm runs the user-selected function. Only VIEW_MODE applies
+  // here -- bookmarking already has its own menu entry, and KOReader sync and
+  // the dictionary are text-reader features with nothing to act on in a paged
+  // image. Anything else falls through and Confirm behaves as before.
+  if (mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
+      SETTINGS.longPressMenuFunction == KomaSettings::LP_MENU_VIEW_MODE &&
+      mappedInput.getHeldTime() >= ReaderUtils::BOOKMARK_HOLD_MS && !ignoreNextConfirmRelease) {
+    toggleViewMode();
+    // Latched before the release arrives, so the hold cannot also open the menu
+    // and cannot re-fire while the button stays down.
+    ignoreNextConfirmRelease = true;
+    requestUpdate();
     return;
   }
 

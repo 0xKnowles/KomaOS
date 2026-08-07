@@ -185,6 +185,8 @@ class KomaSettings : public PersistableStore<KomaSettings> {
     LP_MENU_DISABLED = 1,
     LP_MENU_BOOKMARK = 2,
     LP_MENU_DICTIONARY = 3,
+    // XTC only: the EPUB reader has no view mode, so it falls through there.
+    LP_MENU_VIEW_MODE = 4,
     LONG_PRESS_MENU_FUNCTION_COUNT
   };
 
