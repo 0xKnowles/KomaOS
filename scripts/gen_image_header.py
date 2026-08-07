@@ -121,9 +121,10 @@ def emit(name, width, height, data, per_line=19):
     for start in range(0, len(data), per_line):
         chunk = data[start:start + per_line]
         lines.append("    " + " ".join(f"0x{b:02x}," for b in chunk))
-    # Strip the trailing comma on the final value.
-    lines[-1] = lines[-1].rstrip(",")
-    lines.append("};")
+    # Strip the trailing comma, then close the initializer on the same line:
+    # that is what clang-format produces, and src/images is not excluded from
+    # the repo's format check, so a header that closes on its own line fails CI.
+    lines[-1] = lines[-1].rstrip(",") + "};"
     return "\n".join(lines) + "\n"
 
 

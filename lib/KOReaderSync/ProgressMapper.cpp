@@ -769,8 +769,7 @@ bool streamSpine(const std::shared_ptr<Epub>& epub, int spineIndex, ParagraphStr
 }
 }  // namespace
 
-SavedProgressPosition ProgressMapper::toSavedProgress(const std::shared_ptr<Epub>& epub,
-                                                      const KomaPosition& pos) {
+SavedProgressPosition ProgressMapper::toSavedProgress(const std::shared_ptr<Epub>& epub, const KomaPosition& pos) {
   SavedProgressPosition result;
   float intra =
       (pos.totalPages > 1) ? static_cast<float>(pos.pageNumber) / static_cast<float>(pos.totalPages - 1) : 0.0f;
@@ -791,8 +790,8 @@ SavedProgressPosition ProgressMapper::toSavedProgress(const std::shared_ptr<Epub
 }
 
 std::optional<KomaPosition> ProgressMapper::fromRichPosition(const std::shared_ptr<Epub>& epub,
-                                                                   const KOReaderRichPosition& rich,
-                                                                   GfxRenderer& renderer, bool xpathAlreadyTried) {
+                                                             const KOReaderRichPosition& rich, GfxRenderer& renderer,
+                                                             bool xpathAlreadyTried) {
   const int spineCount = epub->getSpineItemsCount();
   if (static_cast<int>(rich.spineIndex) >= spineCount) {
     LOG_DBG("PM", "Rich position spine %u out of range (%d spine items)", rich.spineIndex, spineCount);
@@ -856,8 +855,8 @@ std::optional<KomaPosition> ProgressMapper::fromRichPosition(const std::shared_p
 }
 
 KomaPosition ProgressMapper::toKomaOS(const std::shared_ptr<Epub>& epub, const SavedProgressPosition& koPos,
-                                                GfxRenderer& renderer, int currentSpineIndex,
-                                                int totalPagesInCurrentSpine, int fallbackTotalPages) {
+                                      GfxRenderer& renderer, int currentSpineIndex, int totalPagesInCurrentSpine,
+                                      int fallbackTotalPages) {
   KomaPosition result{};
   const size_t bookSize = epub->getBookSize();
   if (bookSize == 0) return result;

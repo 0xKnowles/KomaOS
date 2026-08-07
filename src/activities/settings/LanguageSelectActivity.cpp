@@ -6,8 +6,8 @@
 #include <algorithm>
 #include <iterator>
 
-#include "KomaSettings.h"
 #include "I18nKeys.h"
+#include "KomaSettings.h"
 #include "MappedInputManager.h"
 #include "fontIds.h"
 

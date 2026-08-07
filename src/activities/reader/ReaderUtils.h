@@ -1,9 +1,9 @@
 #pragma once
 
-#include <KomaSettings.h>
 #include <GfxRenderer.h>
 #include <HalGPIO.h>
 #include <HalTiltSensor.h>
+#include <KomaSettings.h>
 #include <Logging.h>
 #include <components/bars/tap-zones.h>
 

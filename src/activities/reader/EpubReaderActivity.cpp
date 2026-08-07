@@ -18,8 +18,6 @@
 
 #include "../../util/BookmarkFile.h"
 #include "BookmarkEntry.h"
-#include "KomaSettings.h"
-#include "KomaState.h"
 #include "DictionaryWordSelectActivity.h"
 #include "EpubReaderBookmarksActivity.h"
 #include "EpubReaderChapterSelectionActivity.h"
@@ -28,6 +26,8 @@
 #include "EpubReaderUtils.h"
 #include "KOReaderCredentialStore.h"
 #include "KOReaderSyncActivity.h"
+#include "KomaSettings.h"
+#include "KomaState.h"
 #include "MappedInputManager.h"
 #include "ProgressMapper.h"
 #include "QrDisplayActivity.h"

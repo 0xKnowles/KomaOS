@@ -10,9 +10,9 @@
 
 #include "ButtonRemapActivity.h"
 #include "ClearCacheActivity.h"
-#include "KomaSettings.h"
 #include "FontDownloadActivity.h"
 #include "KOReaderSettingsActivity.h"
+#include "KomaSettings.h"
 #include "LanguageSelectActivity.h"
 #include "MappedInputManager.h"
 #include "OpdsServerListActivity.h"

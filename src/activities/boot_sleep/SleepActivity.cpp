@@ -214,8 +214,8 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
   LOG_DBG("SLP", "drawing to %d x %d", x, y);
   renderer.clearScreen();
 
-  const bool hasGreyscale = bitmap.hasGreyscale() &&
-                            SETTINGS.sleepScreenCoverFilter == KomaSettings::SLEEP_SCREEN_COVER_FILTER::NO_FILTER;
+  const bool hasGreyscale =
+      bitmap.hasGreyscale() && SETTINGS.sleepScreenCoverFilter == KomaSettings::SLEEP_SCREEN_COVER_FILTER::NO_FILTER;
 
   renderer.drawBitmap(bitmap, x, y, pageWidth, pageHeight, cropX, cropY);
 

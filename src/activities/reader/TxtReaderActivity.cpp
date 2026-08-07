@@ -357,8 +357,8 @@ void TxtReaderActivity::renderPage() {
         int x = cachedOrientedMarginLeft;
         const bool lineIsRtl = BidiUtils::startsWithRtl(line.c_str(), BidiUtils::RTL_PARAGRAPH_PROBE_DEPTH);
         uint8_t effectiveAlignment = cachedParagraphAlignment;
-        if (lineIsRtl && (effectiveAlignment == KomaSettings::LEFT_ALIGN ||
-                          effectiveAlignment == KomaSettings::JUSTIFIED)) {
+        if (lineIsRtl &&
+            (effectiveAlignment == KomaSettings::LEFT_ALIGN || effectiveAlignment == KomaSettings::JUSTIFIED)) {
           effectiveAlignment = KomaSettings::RIGHT_ALIGN;
         }
         const int textWidth = renderer.getTextAdvanceX(cachedFontId, line.c_str(), EpdFontFamily::REGULAR);

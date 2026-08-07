@@ -7,9 +7,9 @@
 
 #include <optional>
 
-#include "KomaSettings.h"
 #include "Epub.h"
 #include "EpubReaderActivity.h"
+#include "KomaSettings.h"
 #include "SdCardFontSystem.h"
 #include "Txt.h"
 #include "TxtReaderActivity.h"

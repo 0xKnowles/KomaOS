@@ -12,8 +12,8 @@
 #include <string>
 #include <vector>
 
-#include "KomaSettings.h"
 #include "KOReaderCredentialStore.h"
+#include "KomaSettings.h"
 #include "ReaderFontSizes.h"
 #include "activities/settings/SettingsActivity.h"
 #include "util/DictionaryRegistry.h"
@@ -246,10 +246,10 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         SettingInfo::Enum(StrId::STR_LINE_SPACING, &KomaSettings::lineSpacing,
                           {StrId::STR_TIGHT, StrId::STR_NORMAL, StrId::STR_WIDE}, "lineSpacing", StrId::STR_CAT_READER)
             .withTextSettings(),
-        SettingInfo::Value(StrId::STR_SCREEN_MARGIN, &KomaSettings::screenMargin,
-                           {KomaSettings::SCREEN_MARGIN_MIN, KomaSettings::SCREEN_MARGIN_MAX,
-                            KomaSettings::SCREEN_MARGIN_STEP},
-                           "screenMargin", StrId::STR_CAT_READER)
+        SettingInfo::Value(
+            StrId::STR_SCREEN_MARGIN, &KomaSettings::screenMargin,
+            {KomaSettings::SCREEN_MARGIN_MIN, KomaSettings::SCREEN_MARGIN_MAX, KomaSettings::SCREEN_MARGIN_STEP},
+            "screenMargin", StrId::STR_CAT_READER)
             .withTextSettings(),
         SettingInfo::Enum(StrId::STR_PARA_ALIGNMENT, &KomaSettings::paragraphAlignment,
                           {StrId::STR_JUSTIFY, StrId::STR_ALIGN_LEFT, StrId::STR_CENTER, StrId::STR_ALIGN_RIGHT,
@@ -269,8 +269,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
             StrId::STR_ORIENTATION, &KomaSettings::orientation,
             {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_ORIENTATION_INVERTED, StrId::STR_LANDSCAPE_CCW},
             "orientation", StrId::STR_CAT_READER),
-        SettingInfo::Toggle(StrId::STR_EXTRA_SPACING, &KomaSettings::extraParagraphSpacing,
-                            "extraParagraphSpacing", StrId::STR_CAT_READER)
+        SettingInfo::Toggle(StrId::STR_EXTRA_SPACING, &KomaSettings::extraParagraphSpacing, "extraParagraphSpacing",
+                            StrId::STR_CAT_READER)
             .withTextSettings(),
         SettingInfo::Toggle(StrId::STR_TEXT_AA, &KomaSettings::textAntiAliasing, "textAntiAliasing",
                             StrId::STR_CAT_READER)
@@ -297,16 +297,15 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
             StrId::STR_SHORT_PWR_BTN, &KomaSettings::shortPwrBtn,
             {StrId::STR_IGNORE, StrId::STR_SLEEP, StrId::STR_PAGE_TURN, StrId::STR_FORCE_REFRESH, StrId::STR_FOOTNOTES},
             "shortPwrBtn", StrId::STR_CAT_CONTROLS),
-        SettingInfo::Toggle(StrId::STR_PWR_BTN_FOOTNOTE_BACK, &KomaSettings::pwrBtnFootnoteBack,
-                            "pwrBtnFootnoteBack", StrId::STR_CAT_CONTROLS),
+        SettingInfo::Toggle(StrId::STR_PWR_BTN_FOOTNOTE_BACK, &KomaSettings::pwrBtnFootnoteBack, "pwrBtnFootnoteBack",
+                            StrId::STR_CAT_CONTROLS),
         SettingInfo::Toggle(StrId::STR_BACK_SHORT_TO_FILE_BROWSER, &KomaSettings::backShortToFileBrowser,
                             "backShortToFileBrowser", StrId::STR_CAT_CONTROLS),
 
         // --- System ---
-        SettingInfo::Value(
-            StrId::STR_TIME_TO_SLEEP, &KomaSettings::sleepTimeoutMinutes,
-            {KomaSettings::MIN_SLEEP_TIMEOUT_MINUTES, KomaSettings::MAX_SLEEP_TIMEOUT_MINUTES, 1},
-            "sleepTimeoutMinutes", StrId::STR_CAT_SYSTEM),
+        SettingInfo::Value(StrId::STR_TIME_TO_SLEEP, &KomaSettings::sleepTimeoutMinutes,
+                           {KomaSettings::MIN_SLEEP_TIMEOUT_MINUTES, KomaSettings::MAX_SLEEP_TIMEOUT_MINUTES, 1},
+                           "sleepTimeoutMinutes", StrId::STR_CAT_SYSTEM),
         SettingInfo::Toggle(StrId::STR_SHOW_HIDDEN_FILES, &KomaSettings::showHiddenFiles, "showHiddenFiles",
                             StrId::STR_CAT_SYSTEM),
         SettingInfo::Toggle(StrId::STR_REMOVE_READ_FROM_RECENTS, &KomaSettings::removeReadBooksFromRecents,
@@ -393,8 +392,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         // Range 0..104 = quarter-hour steps from UTC-12:00 to UTC+14:00, biased by 48.
         SettingInfo::Enum(StrId::STR_CLOCK, &KomaSettings::statusBarClock, std::move(statusBarClockValues),
                           "statusBarClock", StrId::STR_CUSTOMISE_STATUS_BAR),
-        SettingInfo::Value(StrId::STR_CLOCK_UTC_OFFSET, &KomaSettings::clockUtcOffsetQ, {0, 104, 1},
-                           "clockUtcOffsetQ", StrId::STR_CUSTOMISE_STATUS_BAR),
+        SettingInfo::Value(StrId::STR_CLOCK_UTC_OFFSET, &KomaSettings::clockUtcOffsetQ, {0, 104, 1}, "clockUtcOffsetQ",
+                           StrId::STR_CUSTOMISE_STATUS_BAR),
         SettingInfo::Enum(StrId::STR_CLOCK_FORMAT, &KomaSettings::clockFormat,
                           {StrId::STR_CLOCK_FORMAT_24H, StrId::STR_CLOCK_FORMAT_12H}, "clockFormat",
                           StrId::STR_CUSTOMISE_STATUS_BAR),

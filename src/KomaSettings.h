@@ -291,9 +291,7 @@ class KomaSettings : public PersistableStore<KomaSettings> {
   SdFontIdResolver sdFontIdResolver = nullptr;
   void* sdFontResolverCtx = nullptr;
 
-  uint16_t getPowerButtonDuration() const {
-    return (shortPwrBtn == KomaSettings::SHORT_PWRBTN::SLEEP) ? 10 : 400;
-  }
+  uint16_t getPowerButtonDuration() const { return (shortPwrBtn == KomaSettings::SHORT_PWRBTN::SLEEP) ? 10 : 400; }
   int getReaderFontId() const;
 
   // Drop the SD font selection and fall back to the built-in family. The reader

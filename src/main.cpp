@@ -19,9 +19,9 @@
 
 #include <cstring>
 
+#include "KOReaderCredentialStore.h"
 #include "KomaSettings.h"
 #include "KomaState.h"
-#include "KOReaderCredentialStore.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
 #include "RecentBooksStore.h"

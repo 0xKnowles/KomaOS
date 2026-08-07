@@ -12,8 +12,8 @@
 #include <algorithm>
 #include <cctype>
 
-#include "KomaSettings.h"
 #include "FontInstaller.h"
+#include "KomaSettings.h"
 #include "OpdsServerStore.h"
 #include "SdCardFontSystem.h"
 #include "SettingsList.h"
@@ -495,9 +495,7 @@ void KomaWebServer::scanFiles(const char* path, const std::function<void(FileInf
 
 bool KomaWebServer::isEpubFile(const String& filename) const { return FsHelpers::hasEpubExtension(filename); }
 
-void KomaWebServer::handleFileList() const {
-  sendHtmlContent(server.get(), FilesPageHtml, sizeof(FilesPageHtml));
-}
+void KomaWebServer::handleFileList() const { sendHtmlContent(server.get(), FilesPageHtml, sizeof(FilesPageHtml)); }
 
 void KomaWebServer::handleFileListData() const {
   // Get current path from query string (default to root)

@@ -68,8 +68,8 @@ class ProgressMapper {
    * @return KomaOS position
    */
   static KomaPosition toKomaOS(const std::shared_ptr<Epub>& epub, const SavedProgressPosition& savedPos,
-                                         GfxRenderer& renderer, int currentSpineIndex = -1,
-                                         int totalPagesInCurrentSpine = 0, int fallbackTotalPages = 0);
+                               GfxRenderer& renderer, int currentSpineIndex = -1, int totalPagesInCurrentSpine = 0,
+                               int fallbackTotalPages = 0);
 
   /**
    * Convert a rich KomaOS position (downloaded from a komaos-sync
@@ -85,8 +85,8 @@ class ProgressMapper {
    *         should fall back to toKomaOS().
    */
   static std::optional<KomaPosition> fromRichPosition(const std::shared_ptr<Epub>& epub,
-                                                            const KOReaderRichPosition& rich, GfxRenderer& renderer,
-                                                            bool xpathAlreadyTried = false);
+                                                      const KOReaderRichPosition& rich, GfxRenderer& renderer,
+                                                      bool xpathAlreadyTried = false);
 
  private:
   /**

@@ -248,8 +248,7 @@ KomaSettings::StatusBarSpec KomaSettings::statusBarSpec() const {
   return spec;
 }
 
-ReaderRenderSpec KomaSettings::readerRenderSpec(const uint16_t viewportWidth,
-                                                      const uint16_t viewportHeight) const {
+ReaderRenderSpec KomaSettings::readerRenderSpec(const uint16_t viewportWidth, const uint16_t viewportHeight) const {
   ReaderRenderSpec spec;
   spec.fontId = getReaderFontId();
   spec.lineCompression = getReaderLineCompression();
