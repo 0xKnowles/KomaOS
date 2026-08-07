@@ -298,7 +298,10 @@ static AlignedMemRect screenRectToAlignedMemRect(GfxRenderer::Orientation orient
   return out;
 }
 
-enum class TextRotation { None, Rotated90CW };
+// Rotated90CW and Rotated90CCW turn the glyph opposite ways. The names follow
+// the existing drawTextRotated90CW's convention, whichever way round that
+// actually is on the panel -- what matters here is that they are mirrors.
+enum class TextRotation { None, Rotated90CW, Rotated90CCW };
 
 // Shared glyph rendering logic for normal and rotated text.
 // Coordinate mapping and cursor advance direction are selected at compile time via the template parameter.
@@ -396,7 +399,13 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
   // Tiled-grayscale band culling: if this glyph's physical y-extent is entirely
   // outside the active strip, skip it before the expensive bitmap decode. This
   // is what makes per-band re-rendering cheap. No-op outside strip mode.
-  if constexpr (rotation == TextRotation::Rotated90CW) {
+  if constexpr (rotation == TextRotation::Rotated90CCW) {
+    const int ob = cursorX - (fontData->ascender - top);
+    const int ib = cursorY + left;
+    if (!renderer.glyphIntersectsStrip(ob - (height - 1), ib, ob, ib + width - 1)) {
+      return;
+    }
+  } else if constexpr (rotation == TextRotation::Rotated90CW) {
     const int ob = cursorX + fontData->ascender - top;
     const int ib = cursorY - left;
     if (!renderer.glyphIntersectsStrip(ob, ib - (width - 1), ob + height - 1, ib)) {
@@ -415,8 +424,17 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
   if (bitmap != nullptr) {
     // For Normal:  outer loop advances screenY, inner loop advances screenX
     // For Rotated: outer loop advances screenX, inner loop advances screenY (in reverse)
+    // Compile-time so the multiply folds away. The comparison is on a template
+    // parameter, so it is trivially constant in each instantiation -- which is
+    // what cppcheck reports rather than a real always-true condition.
+    // cppcheck-suppress knownConditionTrueFalse
+    constexpr int outerStep = rotation == TextRotation::Rotated90CCW ? -1 : 1;
+
     int outerBase, innerBase;
-    if constexpr (rotation == TextRotation::Rotated90CW) {
+    if constexpr (rotation == TextRotation::Rotated90CCW) {
+      outerBase = cursorX - (fontData->ascender - top);  // screenX = outerBase - glyphY
+      innerBase = cursorY + left;                        // screenY = innerBase + glyphX
+    } else if constexpr (rotation == TextRotation::Rotated90CW) {
       outerBase = cursorX + fontData->ascender - top;  // screenX = outerBase + glyphY
       innerBase = cursorY - left;                      // screenY = innerBase - glyphX
     } else {
@@ -427,10 +445,13 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
     if (is2Bit) {
       int pixelPosition = 0;
       for (int glyphY = 0; glyphY < height; glyphY++) {
-        const int outerCoord = outerBase + glyphY;
+        const int outerCoord = outerBase + outerStep * glyphY;
         for (int glyphX = 0; glyphX < width; glyphX++, pixelPosition++) {
           int screenX, screenY;
-          if constexpr (rotation == TextRotation::Rotated90CW) {
+          if constexpr (rotation == TextRotation::Rotated90CCW) {
+            screenX = outerCoord;
+            screenY = innerBase + glyphX;
+          } else if constexpr (rotation == TextRotation::Rotated90CW) {
             screenX = outerCoord;
             screenY = innerBase - glyphX;
           } else {
@@ -462,10 +483,13 @@ static void renderCharImpl(const GfxRenderer& renderer, GfxRenderer::RenderMode 
     } else {
       int pixelPosition = 0;
       for (int glyphY = 0; glyphY < height; glyphY++) {
-        const int outerCoord = outerBase + glyphY;
+        const int outerCoord = outerBase + outerStep * glyphY;
         for (int glyphX = 0; glyphX < width; glyphX++, pixelPosition++) {
           int screenX, screenY;
-          if constexpr (rotation == TextRotation::Rotated90CW) {
+          if constexpr (rotation == TextRotation::Rotated90CCW) {
+            screenX = outerCoord;
+            screenY = innerBase + glyphX;
+          } else if constexpr (rotation == TextRotation::Rotated90CW) {
             screenX = outerCoord;
             screenY = innerBase - glyphX;
           } else {
@@ -2091,9 +2115,14 @@ void GfxRenderer::drawTextGlyphsTurned(const int fontId, const int x, const int 
     // text is digits and Latin, where they do not arise.
     if (utf8IsCombiningMark(cp) || BidiUtils::isTransparentMark(cp)) continue;
 
-    // Same per-glyph mapping the side-button hints use -- only the cursor
-    // differs, advancing along x here instead of up the panel.
-    renderCharImpl<TextRotation::Rotated90CW>(*this, renderMode, font, cp, cellX, y, black, style);
+    // The mirror of the side-button hints' mapping, not the same one. Reusing
+    // theirs turned the letters the opposite way, which reads as upside down
+    // once the device is turned: right for a hint sitting beside a button on
+    // the panel edge, wrong for a status bar under pre-rotated artwork.
+    //
+    // Anchored at the cell's trailing edge because this mapping grows back from
+    // its cursor rather than forward from it.
+    renderCharImpl<TextRotation::Rotated90CCW>(*this, renderMode, font, cp, cellX + cell, y, black, style);
     cellX += cell;
   }
 }
