@@ -67,6 +67,7 @@ inline XtcSplitGeometry decodeSplitGeometry(const uint64_t packed) {
   g.stripsPerPage = static_cast<uint8_t>((packed >> 8) & 0xFF);
   g.overlapPerMille = static_cast<uint16_t>((packed >> 16) & 0xFFFF);
   g.rotationQuarterTurns = static_cast<uint8_t>((packed >> 32) & 0x03);
+  g.leadingStrips = static_cast<uint8_t>((packed >> 40) & 0xFF);
   g.valid = g.stripsPerPage > 0;
   return g;
 }

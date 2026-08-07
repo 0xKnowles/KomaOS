@@ -553,7 +553,19 @@ uint32_t XtcReaderActivity::pageStep() const { return fullViewActive() ? FullPag
 
 uint32_t XtcReaderActivity::pageGroupStart() const {
   const uint32_t step = pageStep();
-  return (currentPage / step) * step;
+  if (step <= 1) {
+    return currentPage;
+  }
+
+  // The cover is encoded nosplit, so it is one strip on its own and every group
+  // after it is offset by that. Grouping from zero instead splices the cover
+  // onto the next page's first two strips, and every page from there is a mix
+  // of two -- the symptom that sent this back for a second look.
+  const uint32_t leading = xtc->getSplitGeometry().leadingStrips;
+  if (currentPage < leading) {
+    return currentPage;  // Still in the lead-in; each of those stands alone.
+  }
+  return leading + ((currentPage - leading) / step) * step;
 }
 
 bool XtcReaderActivity::renderFullPage() {
@@ -595,6 +607,11 @@ bool XtcReaderActivity::renderFullPage() {
   renderer.clearScreen();
 
   const uint32_t firstStrip = pageGroupStart();
+  // A lead-in strip is a whole page by itself; reassembling from it would pull
+  // in the next page's strips.
+  if (firstStrip < xtc->getSplitGeometry().leadingStrips) {
+    return false;
+  }
   for (int i = 0; i < FullPageLayout::STRIPS_PER_PAGE; i++) {
     const FullPageLayout::StripPlacement& placement = layout.strips[i];
     if (!placement.contributes()) continue;
