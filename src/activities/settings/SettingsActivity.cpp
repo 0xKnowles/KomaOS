@@ -34,6 +34,23 @@ const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_DIS
                                                               StrId::STR_CAT_MANGA, StrId::STR_CAT_CONTROLS,
                                                               StrId::STR_CAT_SYSTEM};
 
+const std::vector<SettingInfo>* SettingsActivity::settingsForCategory(const int categoryIndex) const {
+  switch (categoryIndex) {
+    case 0:
+      return &displaySettings;
+    case 1:
+      return &readerSettings;
+    case 2:
+      return &mangaSettings;
+    case 3:
+      return &controlsSettings;
+    case 4:
+      return &systemSettings;
+    default:
+      return &displaySettings;
+  }
+}
+
 void SettingsActivity::rebuildSettingsLists() {
   displaySettings.clear();
   readerSettings.clear();
@@ -94,23 +111,7 @@ void SettingsActivity::rebuildSettingsLists() {
   readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
 
   // Update currentSettings pointer and count for the active category
-  switch (selectedCategoryIndex) {
-    case 0:
-      currentSettings = &displaySettings;
-      break;
-    case 1:
-      currentSettings = &readerSettings;
-      break;
-    case 2:
-      currentSettings = &mangaSettings;
-      break;
-    case 3:
-      currentSettings = &controlsSettings;
-      break;
-    case 4:
-      currentSettings = &systemSettings;
-      break;
-  }
+  currentSettings = settingsForCategory(selectedCategoryIndex);
   settingsCount = static_cast<int>(currentSettings->size());
 }
 
@@ -143,20 +144,7 @@ void SettingsActivity::loop() {
   bool hasChangedCategory = false;
 
   auto applyCategorySelection = [this] {
-    switch (selectedCategoryIndex) {
-      case 0:
-        currentSettings = &displaySettings;
-        break;
-      case 1:
-        currentSettings = &readerSettings;
-        break;
-      case 2:
-        currentSettings = &controlsSettings;
-        break;
-      case 3:
-        currentSettings = &systemSettings;
-        break;
-    }
+    currentSettings = settingsForCategory(selectedCategoryIndex);
     settingsCount = static_cast<int>(currentSettings->size());
   };
 

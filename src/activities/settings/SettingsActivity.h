@@ -171,6 +171,11 @@ class SettingsActivity final : public Activity {
   OptionPopup optionPopup;
 
   static constexpr int categoryCount = 5;
+  // Single source of truth for tab index -> settings list. Previously this
+  // mapping was open-coded in two switches that had to agree; they silently
+  // stopped agreeing when the Manga category was added, so the Manga tab showed
+  // Controls and the System tab showed a stale list.
+  const std::vector<SettingInfo>* settingsForCategory(int categoryIndex) const;
   static const StrId categoryNames[categoryCount];
 
   void enterCategory(int categoryIndex);
