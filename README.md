@@ -1,5 +1,7 @@
 # KomaOS
 
+<img src="./docs/images/komaos-lockup.png" alt="KomaOS" width="320">
+
 **Manga-first e-reader firmware for ESP32-C3 Xteink devices.**
 
 *Koma* (コマ) is the Japanese word for a manga panel. KomaOS keeps everything that makes
