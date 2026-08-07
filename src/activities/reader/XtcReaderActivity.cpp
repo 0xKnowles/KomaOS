@@ -607,20 +607,18 @@ bool XtcReaderActivity::renderFullPage() {
     }
 
     // Ink level 0..3 at a stored strip pixel, whatever the bit depth.
-    // The file's rotationQuarterTurns is deliberately NOT wired in here yet.
-    // It says the encoder applied one clockwise quarter turn, which predicts
-    // mirroring stored X alone -- but on hardware the page came out a full 180
-    // out, so something downstream adds a second flip that is not yet found.
-    // Mirroring both axes is what actually renders right, so that stays until
-    // the discrepancy is explained on a device rather than on paper.
-    //
-    // The strip's quarter turn runs the opposite way to the obvious reading of
-    // it: page rows count DOWN stored X and page columns count DOWN stored Y.
-    // Sampling it the other way put the page 180 degrees out AND cropped the
-    // wrong end of each strip -- the duplicated lead sits at high X, so cutting
-    // low X left the overlap in and dropped unique art instead.
+    // Page rows count DOWN stored X: the duplicated lead sits at high X, so
+    // cropping low X would leave the overlap in and drop unique art instead.
+    // This now agrees with the file's rotationQuarterTurns, which records the
+    // single clockwise turn the encoder applied -- the earlier both-axis mirror
+    // was an over-correction that happened to fix the rotation while
+    // introducing a left-to-right flip.
+    // Only the page-direction axis is mirrored. The encoder stores each strip
+    // with one clockwise quarter turn (comic.ts, sharp rotate(90)), which puts
+    // page rows DOWN stored X but leaves page columns running UP stored Y.
+    // Mirroring Y as well flipped the page left-to-right, which is what made
+    // the text read backwards on hardware.
     const auto mirrorX = [stripWidth](const int x) { return stripWidth - 1 - std::clamp(x, 0, stripWidth - 1); };
-    const auto mirrorY = [stripHeight](const int y) { return stripHeight - 1 - std::clamp(y, 0, stripHeight - 1); };
 
     const auto levelAt = [&](const int sx, const int sy) -> int {
       if (bitDepth == 2) {
@@ -654,7 +652,7 @@ bool XtcReaderActivity::renderFullPage() {
           for (int oy = 0; oy < colsPerDest; oy++) {
             const int sy = srcY + oy;
             if (sy >= stripHeight) break;
-            total += levelAt(mirrorX(sx), mirrorY(sy));
+            total += levelAt(mirrorX(sx), std::clamp(sy, 0, stripHeight - 1));
             samples++;
           }
         }
