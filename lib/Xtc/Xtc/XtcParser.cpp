@@ -13,6 +13,8 @@
 
 #include <cstring>
 
+#include "XthPixels.h"
+
 namespace xtc {
 
 XtcParser::XtcParser()
@@ -437,15 +439,19 @@ size_t XtcParser::loadPage(uint32_t pageIndex, uint8_t* buffer, size_t bufferSiz
     return 0;
   }
 
-  // Calculate bitmap size based on bit depth
-  // XTG (1-bit): Row-major, ((width+7)/8) * height bytes
-  // XTH (2-bit): Two bit planes, column-major, ((width * height + 7) / 8) * 2 bytes
-  size_t bitmapSize;
-  if (m_bitDepth == 2) {
-    // XTH: two bit planes, each containing (width * height) bits rounded up to bytes
-    bitmapSize = ((static_cast<size_t>(pageHeader.width) * pageHeader.height + 7) / 8) * 2;
-  } else {
-    bitmapSize = ((pageHeader.width + 7) / 8) * pageHeader.height;
+  // Calculate bitmap size based on bit depth. Both formulas live in
+  // XthPixels.h so the size the page is read at can never drift from the
+  // addressing the renderer walks it with.
+  const size_t bitmapSize = (m_bitDepth == 2) ? XthPage::payloadSizeFor(pageHeader.width, pageHeader.height)
+                                              : xtgPayloadSizeFor(pageHeader.width, pageHeader.height);
+
+  // The encoder also records the payload length in the page header. A mismatch
+  // means the file was written by an encoder that sizes pages differently, and
+  // the addressing below would misread it -- worth a log even though the
+  // computed size is what we trust for bounds.
+  if (pageHeader.dataSize != bitmapSize) {
+    LOG_DBG("XTC", "Page %u header dataSize %u != computed %u (%ux%u, %u-bit)", pageIndex, pageHeader.dataSize,
+            bitmapSize, pageHeader.width, pageHeader.height, m_bitDepth);
   }
 
   // Check buffer size

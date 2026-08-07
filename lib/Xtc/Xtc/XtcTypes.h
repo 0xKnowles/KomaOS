@@ -81,7 +81,7 @@ struct XtgPageHeader {
   //   dataSize = ((width + 7) / 8) * height
   //
   // XTH (2-bit): Two bit planes, column-major (right-to-left), 8 vertical pixels/byte
-  //   dataSize = ((width * height + 7) / 8) * 2
+  //   dataSize = ((height + 7) / 8) * width * 2   (each column padded to a byte)
   //   First plane: Bit1 for all pixels
   //   Second plane: Bit2 for all pixels
   //   pixelValue = (bit1 << 1) | bit2

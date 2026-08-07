@@ -11,6 +11,9 @@
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <Logging.h>
+#include <Memory.h>
+#include <Xtc/XthPixels.h>
 
 #include <algorithm>
 
@@ -204,8 +207,8 @@ void XtcReaderActivity::renderStatusBarOverlay(const StatusBarOverlayPosition po
   const auto sb = SETTINGS.statusBarSpec();
   const bool drawBottom = sb.xtcMode == KomaSettings::XTC_STATUS_BAR_MODE::XTC_STATUS_BAR_BOTTOM &&
                           position == StatusBarOverlayPosition::Bottom;
-  const bool drawTop = sb.xtcMode == KomaSettings::XTC_STATUS_BAR_MODE::XTC_STATUS_BAR_TOP &&
-                       position == StatusBarOverlayPosition::Top;
+  const bool drawTop =
+      sb.xtcMode == KomaSettings::XTC_STATUS_BAR_MODE::XTC_STATUS_BAR_TOP && position == StatusBarOverlayPosition::Top;
   if (!drawBottom && !drawTop) {
     return;
   }
@@ -249,32 +252,33 @@ void XtcReaderActivity::renderPage() {
   const uint16_t pageHeight = xtc->getPageHeight();
   const uint8_t bitDepth = xtc->getBitDepth();
 
-  // Calculate buffer size for one page
-  // XTG (1-bit): Row-major, ((width+7)/8) * height bytes
-  // XTH (2-bit): Two bit planes, column-major, ((width * height + 7) / 8) * 2 bytes
-  size_t pageBufferSize;
-  if (bitDepth == 2) {
-    pageBufferSize = ((static_cast<size_t>(pageWidth) * pageHeight + 7) / 8) * 2;
-  } else {
-    pageBufferSize = ((pageWidth + 7) / 8) * pageHeight;
-  }
+  // Buffer size for one page. Shares its definition with the parser that reads
+  // the page (XthPixels.h) so the two can never disagree about how many bytes a
+  // page occupies.
+  const size_t pageBufferSize = (bitDepth == 2) ? xtc::XthPage::payloadSizeFor(pageWidth, pageHeight)
+                                                : xtc::xtgPayloadSizeFor(pageWidth, pageHeight);
 
-  // Allocate page buffer
-  uint8_t* pageBuffer = static_cast<uint8_t*>(malloc(pageBufferSize));
-  if (!pageBuffer) {
-    LOG_ERR("XTR", "Failed to allocate page buffer (%lu bytes)", pageBufferSize);
+  // Allocate page buffer. Kept per-render rather than hoisted into onEnter():
+  // this is the largest allocation the reader makes (96,000 bytes for a
+  // 480x800 XTH page) and the chapter-selection activity runs nested inside
+  // this one, so holding it across the whole session would shrink the heap
+  // available to that child. Same-size alloc/free cycles reuse the same block,
+  // so the churn is not itself a fragmentation source.
+  auto pageBufferOwner = makeUniqueNoThrow<uint8_t[]>(pageBufferSize);
+  if (!pageBufferOwner) {
+    LOG_ERR("XTR", "OOM: page buffer %lu bytes", pageBufferSize);
     renderer.clearScreen();
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_MEMORY_ERROR), true, EpdFontFamily::BOLD);
     renderer.displayBuffer();
     return;
   }
+  uint8_t* pageBuffer = pageBufferOwner.get();
 
   // Load page data
   size_t bytesRead = xtc->loadPage(currentPage, pageBuffer, pageBufferSize);
   if (bytesRead == 0) {
     LOG_ERR("XTR", "Failed to load page %lu: bufferSize=%lu bitDepth=%u error=%s", currentPage, pageBufferSize,
             bitDepth, xtc::errorToString(xtc->getLastError()));
-    free(pageBuffer);
     renderer.clearScreen();
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_PAGE_LOAD_ERROR), true, EpdFontFamily::BOLD);
     renderer.displayBuffer();
@@ -296,43 +300,49 @@ void XtcReaderActivity::renderPage() {
     // - Pixel value = (bit1 << 1) | bit2
     // - Grayscale: 0=White, 1=Dark Grey, 2=Light Grey, 3=Black
 
-    const size_t planeSize = (static_cast<size_t>(pageWidth) * pageHeight + 7) / 8;
-    const uint8_t* plane1 = pageBuffer;              // Bit1 plane
-    const uint8_t* plane2 = pageBuffer + planeSize;  // Bit2 plane
-    const size_t colBytes = (pageHeight + 7) / 8;    // Bytes per column (100 for 800 height)
+    const xtc::XthPage page(pageBuffer, pageWidth, pageHeight);
 
-    // Lambda to get pixel value at (x, y)
-    auto getPixelValue = [&](uint16_t x, uint16_t y) -> uint8_t {
-      const size_t colIndex = pageWidth - 1 - x;
-      const size_t byteInCol = y / 8;
-      const size_t bitInByte = 7 - (y % 8);
-      const size_t byteOffset = colIndex * colBytes + byteInCol;
-      const uint8_t bit1 = (plane1[byteOffset] >> bitInByte) & 1;
-      const uint8_t bit2 = (plane2[byteOffset] >> bitInByte) & 1;
-      return (bit1 << 1) | bit2;
+    // Walks the page in XTH's own column-major order so the column base offset
+    // -- the only multiply in the addressing -- is computed once per column
+    // rather than once per pixel. Every pass below visits all width*height
+    // pixels, so that removes 384k multiplies per pass at 480x800, on a
+    // single-issue 160MHz core.
+    //
+    // `levelMask` selects which levels the pass acts on (see xtc::XthMask);
+    // `ink` is the state passed to drawPixel for matching pixels.
+    const auto plotWhere = [&](const uint8_t levelMask, const bool ink) {
+      for (uint16_t x = 0; x < pageWidth; x++) {
+        const size_t colBase = page.columnBase(x);
+        for (uint16_t y = 0; y < pageHeight; y++) {
+          if (xtc::XthPage::matches(levelMask, page.levelInColumn(colBase, y))) {
+            renderer.drawPixel(x, y, ink);
+          }
+        }
+      }
     };
 
     // Optimized grayscale rendering without storeBwBuffer (saves 48KB peak memory)
     // Flow: BW display → LSB/MSB passes → grayscale display → re-render BW for next frame
 
-    // Count pixel distribution for debugging
-    uint32_t pixelCounts[4] = {0, 0, 0, 0};
-    for (uint16_t y = 0; y < pageHeight; y++) {
+#if LOG_LEVEL >= 2
+    // Diagnostic only. Guarded because it is a full width*height pass whose
+    // sole consumer is the LOG_DBG below, which compiles away in release --
+    // leaving the loop to run 384k iterations per page turn for nothing.
+    {
+      uint32_t pixelCounts[4] = {0, 0, 0, 0};
       for (uint16_t x = 0; x < pageWidth; x++) {
-        pixelCounts[getPixelValue(x, y)]++;
-      }
-    }
-    LOG_DBG("XTR", "Pixel distribution: White=%lu, DarkGrey=%lu, LightGrey=%lu, Black=%lu", pixelCounts[0],
-            pixelCounts[1], pixelCounts[2], pixelCounts[3]);
-
-    // Pass 1: BW buffer - draw all non-white pixels as black
-    for (uint16_t y = 0; y < pageHeight; y++) {
-      for (uint16_t x = 0; x < pageWidth; x++) {
-        if (getPixelValue(x, y) >= 1) {
-          renderer.drawPixel(x, y, true);
+        const size_t colBase = page.columnBase(x);
+        for (uint16_t y = 0; y < pageHeight; y++) {
+          pixelCounts[page.levelInColumn(colBase, y)]++;
         }
       }
+      LOG_DBG("XTR", "Pixel distribution: White=%lu, DarkGrey=%lu, LightGrey=%lu, Black=%lu", pixelCounts[0],
+              pixelCounts[1], pixelCounts[2], pixelCounts[3]);
     }
+#endif
+
+    // Pass 1: BW buffer - draw all non-white pixels as black
+    plotWhere(xtc::XthMask::NON_WHITE, true);
 
     if (pagesUntilFullRefresh <= 1) {
       // Periodic ghost cleanup: scrub via the normal path, then run the
@@ -351,26 +361,13 @@ void XtcReaderActivity::renderPage() {
     // Pass 2: LSB buffer - mark DARK gray only (XTH value 1)
     // In LUT: 0 bit = apply gray effect, 1 bit = untouched
     renderer.clearScreen(0x00);
-    for (uint16_t y = 0; y < pageHeight; y++) {
-      for (uint16_t x = 0; x < pageWidth; x++) {
-        if (getPixelValue(x, y) == 1) {  // Dark grey only
-          renderer.drawPixel(x, y, false);
-        }
-      }
-    }
+    plotWhere(xtc::XthMask::DARK_GREY, false);
     renderer.copyGrayscaleLsbBuffers();
 
     // Pass 3: MSB buffer - mark LIGHT AND DARK gray (XTH value 1 or 2)
     // In LUT: 0 bit = apply gray effect, 1 bit = untouched
     renderer.clearScreen(0x00);
-    for (uint16_t y = 0; y < pageHeight; y++) {
-      for (uint16_t x = 0; x < pageWidth; x++) {
-        const uint8_t pv = getPixelValue(x, y);
-        if (pv == 1 || pv == 2) {  // Dark grey or Light grey
-          renderer.drawPixel(x, y, false);
-        }
-      }
-    }
+    plotWhere(xtc::XthMask::ANY_GREY, false);
     renderer.copyGrayscaleMsbBuffers();
 
     // Display grayscale overlay
@@ -378,18 +375,10 @@ void XtcReaderActivity::renderPage() {
 
     // Pass 4: Re-render BW to framebuffer (restore for next frame, instead of restoreBwBuffer)
     renderer.clearScreen();
-    for (uint16_t y = 0; y < pageHeight; y++) {
-      for (uint16_t x = 0; x < pageWidth; x++) {
-        if (getPixelValue(x, y) >= 1) {
-          renderer.drawPixel(x, y, true);
-        }
-      }
-    }
+    plotWhere(xtc::XthMask::NON_WHITE, true);
 
     // Cleanup grayscale buffers with current frame buffer
     renderer.cleanupGrayscaleWithFrameBuffer();
-
-    free(pageBuffer);
 
     LOG_DBG("XTR", "Rendered page %lu/%lu (2-bit grayscale)", currentPage + 1, xtc->getPageCount());
     return;
@@ -413,8 +402,6 @@ void XtcReaderActivity::renderPage() {
     }
   }
   // White pixels are already cleared by clearScreen()
-
-  free(pageBuffer);
 
   if (SETTINGS.statusBarSpec().xtcMode == KomaSettings::XTC_STATUS_BAR_MODE::XTC_STATUS_BAR_TOP) {
     renderStatusBarOverlay(StatusBarOverlayPosition::Top);
