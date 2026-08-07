@@ -53,6 +53,24 @@ class KomaSettings : public PersistableStore<KomaSettings> {
     MANGA_DIR_RTL = 2,
     MANGA_READING_DIRECTION_COUNT
   };
+  // Full-refresh cadence for manga. Values are persisted; do not renumber.
+  enum MANGA_REFRESH_FREQUENCY {
+    MANGA_REFRESH_FOLLOW_GLOBAL = 0,
+    MANGA_REFRESH_1 = 1,
+    MANGA_REFRESH_3 = 2,
+    MANGA_REFRESH_5 = 3,
+    MANGA_REFRESH_10 = 4,
+    MANGA_REFRESH_FREQUENCY_COUNT
+  };
+  // Long-press skip distance in the manga reader. A converted volume slices each
+  // source page into ~3 strips, so 3 and 6 land on whole-page boundaries.
+  enum MANGA_SKIP_PAGES {
+    MANGA_SKIP_3 = 0,
+    MANGA_SKIP_6 = 1,
+    MANGA_SKIP_10 = 2,
+    MANGA_SKIP_20 = 3,
+    MANGA_SKIP_PAGES_COUNT
+  };
   enum XTC_STATUS_BAR_MODE {
     XTC_STATUS_BAR_HIDE = 0,
     XTC_STATUS_BAR_BOTTOM = 1,
@@ -197,6 +215,13 @@ class KomaSettings : public PersistableStore<KomaSettings> {
   // Manga page-turn direction. AUTO resolves to left-to-right for every file
   // written by a current encoder, so this defaults to no behaviour change.
   uint8_t mangaReadingDirection = MANGA_DIR_AUTO;
+  // Full-refresh cadence while reading XTC/XTCH. Kept separate from the global
+  // refreshFrequency because a manga page is near-solid ink and ghosts far more
+  // than a page of text, so it wants scrubbing more often than an EPUB does.
+  // FOLLOW_GLOBAL defers to refreshFrequency so this is opt-in.
+  uint8_t mangaRefreshFrequency = MANGA_REFRESH_FOLLOW_GLOBAL;
+  // Pages jumped per long-press in the XTC reader. Was hard-coded to 10.
+  uint8_t mangaSkipPages = MANGA_SKIP_10;
   // Clock display in status bar (X3 only, requires DS3231 RTC)
   uint8_t statusBarClock = STATUS_BAR_CLOCK_HIDE;
   // Clock UTC offset in quarter-hour steps, biased by 48 so it fits in uint8_t.
@@ -362,6 +387,9 @@ class KomaSettings : public PersistableStore<KomaSettings> {
   float getReaderLineCompression() const;
   unsigned long getSleepTimeoutMs() const;
   int getRefreshFrequency() const;
+  // Full-refresh cadence to use in the manga reader, resolving FOLLOW_GLOBAL.
+  int getMangaRefreshFrequency() const;
+  int getMangaSkipPages() const;
 };
 
 // Helper macro to access settings

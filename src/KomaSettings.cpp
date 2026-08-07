@@ -309,6 +309,36 @@ unsigned long KomaSettings::getSleepTimeoutMs() const {
   return static_cast<unsigned long>(minutes) * 60UL * 1000UL;
 }
 
+int KomaSettings::getMangaRefreshFrequency() const {
+  switch (mangaRefreshFrequency) {
+    case MANGA_REFRESH_1:
+      return 1;
+    case MANGA_REFRESH_3:
+      return 3;
+    case MANGA_REFRESH_5:
+      return 5;
+    case MANGA_REFRESH_10:
+      return 10;
+    case MANGA_REFRESH_FOLLOW_GLOBAL:
+    default:
+      return getRefreshFrequency();
+  }
+}
+
+int KomaSettings::getMangaSkipPages() const {
+  switch (mangaSkipPages) {
+    case MANGA_SKIP_3:
+      return 3;
+    case MANGA_SKIP_6:
+      return 6;
+    case MANGA_SKIP_20:
+      return 20;
+    case MANGA_SKIP_10:
+    default:
+      return 10;
+  }
+}
+
 int KomaSettings::getRefreshFrequency() const {
   switch (refreshFrequency) {
     case REFRESH_1:

@@ -27,12 +27,17 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 
+// Manga sits next to Reader: the two are the per-format halves of the same
+// idea, and grouping them keeps the tab order reading Display / Reader / Manga
+// rather than burying the manga options after Controls.
 const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_DISPLAY, StrId::STR_CAT_READER,
-                                                              StrId::STR_CAT_CONTROLS, StrId::STR_CAT_SYSTEM};
+                                                              StrId::STR_CAT_MANGA, StrId::STR_CAT_CONTROLS,
+                                                              StrId::STR_CAT_SYSTEM};
 
 void SettingsActivity::rebuildSettingsLists() {
   displaySettings.clear();
   readerSettings.clear();
+  mangaSettings.clear();
   controlsSettings.clear();
   systemSettings.clear();
 
@@ -54,6 +59,8 @@ void SettingsActivity::rebuildSettingsLists() {
       // (they stay in the shared list for the web settings API)
       if (setting.inTextSettings) continue;
       readerSettings.push_back(setting);
+    } else if (setting.category == StrId::STR_CAT_MANGA) {
+      mangaSettings.push_back(setting);
     } else if (setting.category == StrId::STR_CAT_CONTROLS) {
       if (setting.valuePtr == &KomaSettings::pwrBtnFootnoteBack &&
           SETTINGS.shortPwrBtn != KomaSettings::SHORT_PWRBTN::FOOTNOTES) {
@@ -95,9 +102,12 @@ void SettingsActivity::rebuildSettingsLists() {
       currentSettings = &readerSettings;
       break;
     case 2:
-      currentSettings = &controlsSettings;
+      currentSettings = &mangaSettings;
       break;
     case 3:
+      currentSettings = &controlsSettings;
+      break;
+    case 4:
       currentSettings = &systemSettings;
       break;
   }

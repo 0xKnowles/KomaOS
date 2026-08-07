@@ -233,6 +233,21 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         SettingInfo::Toggle(StrId::STR_SUNLIGHT_FADING_FIX, &KomaSettings::fadingFix, "fadingFix",
                             StrId::STR_CAT_DISPLAY),
 
+        // --- Manga (XTC/XTCH) ---
+        // Everything here affects paged-image reading only; none of it touches
+        // the EPUB path, which is why it is its own category rather than more
+        // entries under Reader.
+        SettingInfo::Enum(StrId::STR_MANGA_READING_DIRECTION, &KomaSettings::mangaReadingDirection,
+                          {StrId::STR_MANGA_DIR_AUTO, StrId::STR_MANGA_DIR_LTR, StrId::STR_MANGA_DIR_RTL},
+                          "mangaReadingDirection", StrId::STR_CAT_MANGA),
+        SettingInfo::Enum(StrId::STR_MANGA_REFRESH_FREQ, &KomaSettings::mangaRefreshFrequency,
+                          {StrId::STR_MANGA_REFRESH_GLOBAL, StrId::STR_PAGES_1, StrId::STR_PAGES_3, StrId::STR_PAGES_5,
+                           StrId::STR_PAGES_10},
+                          "mangaRefreshFrequency", StrId::STR_CAT_MANGA),
+        SettingInfo::Enum(StrId::STR_MANGA_SKIP_PAGES, &KomaSettings::mangaSkipPages,
+                          {StrId::STR_PAGES_3, StrId::STR_PAGES_6, StrId::STR_PAGES_10, StrId::STR_PAGES_20},
+                          "mangaSkipPages", StrId::STR_CAT_MANGA),
+
         // --- Reader ---
         // Built-in font-family entry. Replaced per-call with a registry-aware
         // version when SD fonts are installed.
@@ -256,9 +271,6 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                            StrId::STR_BOOK_S_STYLE},
                           "paragraphAlignment", StrId::STR_CAT_READER)
             .withTextSettings(),
-        SettingInfo::Enum(StrId::STR_MANGA_READING_DIRECTION, &KomaSettings::mangaReadingDirection,
-                          {StrId::STR_MANGA_DIR_AUTO, StrId::STR_MANGA_DIR_LTR, StrId::STR_MANGA_DIR_RTL},
-                          "mangaReadingDirection", StrId::STR_CAT_READER),
         SettingInfo::Toggle(StrId::STR_EMBEDDED_STYLE, &KomaSettings::embeddedStyle, "embeddedStyle",
                             StrId::STR_CAT_READER)
             .withTextSettings(),

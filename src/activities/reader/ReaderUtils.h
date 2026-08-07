@@ -115,7 +115,12 @@ inline bool isTouchMenuGesture(const MappedInputManager& input) {
 // Async callers must not touch the framebuffer until
 // renderer.waitRefreshComplete() and must rebuild the differential baseline
 // before the next page turn (the tiled grayscale cleanup does).
-inline void displayWithRefreshCycle(const GfxRenderer& renderer, int& pagesUntilFullRefresh, bool async = false) {
+// `fullRefreshEvery` overrides how many page turns pass before the next full
+// refresh; 0 means "use the global Display setting". The manga reader passes
+// its own cadence here because a near-solid-ink page ghosts far more than a
+// page of text and wants scrubbing more often. Every other reader omits it.
+inline void displayWithRefreshCycle(const GfxRenderer& renderer, int& pagesUntilFullRefresh, bool async = false,
+                                    int fullRefreshEvery = 0) {
   const auto mode = (pagesUntilFullRefresh <= 1) ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH;
   if (async) {
     renderer.displayBufferAsync(mode);
@@ -123,7 +128,7 @@ inline void displayWithRefreshCycle(const GfxRenderer& renderer, int& pagesUntil
     renderer.displayBuffer(mode);
   }
   if (pagesUntilFullRefresh <= 1) {
-    pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
+    pagesUntilFullRefresh = fullRefreshEvery > 0 ? fullRefreshEvery : SETTINGS.getRefreshFrequency();
   } else {
     pagesUntilFullRefresh--;
   }
