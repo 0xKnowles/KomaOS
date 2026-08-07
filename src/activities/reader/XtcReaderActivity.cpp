@@ -25,9 +25,15 @@
 #include "ProgressFile.h"
 #include "ReaderUtils.h"
 #include "RecentBooksStore.h"
+#include "XtcReaderBookmarksActivity.h"
 #include "XtcReaderChapterSelectionActivity.h"
+#include "XtcReaderMenuActivity.h"
+#include "XtcReaderPageJumpActivity.h"
+#include "activities/settings/SettingsActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/ScreenshotUtil.h"
+#include "util/XtcBookmarks.h"
 
 void XtcReaderActivity::onEnter() {
   Activity::onEnter();
@@ -44,6 +50,7 @@ void XtcReaderActivity::onEnter() {
 
   // Load saved progress
   loadProgress();
+  XtcBookmarks::load(xtc->getCachePath(), bookmarkedPages);
 
   // Save current XTC as last opened book and add to recent books
   APP_STATE.openEpubPath = xtc->getPath();
@@ -70,6 +77,92 @@ void XtcReaderActivity::openChapterSelection() {
                                currentPage = std::get<PageResult>(result.data).page;
                              }
                            });
+  }
+}
+
+void XtcReaderActivity::openReaderMenu() {
+  if (!xtc) {
+    return;
+  }
+  startActivityForResult(std::make_unique<XtcReaderMenuActivity>(
+                             renderer, mappedInput, xtc->getTitle(), currentPage, xtc->getPageCount(),
+                             SETTINGS.orientation, xtc->hasChapters() && !xtc->getChapters().empty(),
+                             !bookmarkedPages.empty(), XtcBookmarks::contains(bookmarkedPages, currentPage)),
+                         [this](const ActivityResult& result) {
+                           const auto& menu = std::get<MenuResult>(result.data);
+                           // Orientation is applied even on cancel: the popup changes it live, so
+                           // discarding it here would revert what the user just saw happen.
+                           if (menu.orientation != SETTINGS.orientation) {
+                             SETTINGS.orientation = menu.orientation;
+                             SETTINGS.saveToFile();
+                             // No reflow to redo, unlike the EPUB reader: an XTC page is a fixed
+                             // image, so applying the transform and re-rendering is the whole job.
+                             ReaderUtils::applyOrientation(renderer, SETTINGS.orientation);
+                           }
+                           if (!result.isCancelled) {
+                             onReaderMenuConfirm(menu.action);
+                           }
+                           requestUpdate();
+                         });
+}
+
+void XtcReaderActivity::toggleBookmarkForCurrentPage() {
+  XtcBookmarks::toggle(bookmarkedPages, currentPage);
+  if (!XtcBookmarks::save(xtc->getCachePath(), bookmarkedPages)) {
+    LOG_ERR("XTR", "Failed to save bookmarks for page %lu", currentPage);
+  }
+}
+
+void XtcReaderActivity::onReaderMenuConfirm(const int action) {
+  switch (static_cast<XtcReaderMenuActivity::MenuAction>(action)) {
+    case XtcReaderMenuActivity::MenuAction::QUICK_JUMP:
+      startActivityForResult(
+          std::make_unique<XtcReaderPageJumpActivity>(renderer, mappedInput, currentPage, xtc->getPageCount()),
+          [this](const ActivityResult& result) {
+            if (!result.isCancelled) {
+              currentPage = std::get<PageResult>(result.data).page;
+            }
+            requestUpdate();
+          });
+      break;
+
+    case XtcReaderMenuActivity::MenuAction::BOOKMARKS:
+      startActivityForResult(
+          std::make_unique<XtcReaderBookmarksActivity>(renderer, mappedInput, bookmarkedPages, xtc->getPageCount()),
+          [this](const ActivityResult& result) {
+            if (!result.isCancelled) {
+              currentPage = std::get<PageResult>(result.data).page;
+            }
+            requestUpdate();
+          });
+      break;
+
+    case XtcReaderMenuActivity::MenuAction::TOGGLE_BOOKMARK:
+      toggleBookmarkForCurrentPage();
+      break;
+
+    case XtcReaderMenuActivity::MenuAction::SELECT_CHAPTER:
+      openChapterSelection();
+      break;
+
+    case XtcReaderMenuActivity::MenuAction::MANGA_SETTINGS:
+      // Opens the settings screen on the Manga tab, so the options that affect
+      // what is on screen are one step away rather than five.
+      startActivityForResult(std::make_unique<SettingsActivity>(renderer, mappedInput, SettingsActivity::MANGA_TAB),
+                             [this](const ActivityResult&) { requestUpdate(); });
+      break;
+
+    case XtcReaderMenuActivity::MenuAction::SCREENSHOT:
+      ScreenshotUtil::takeScreenshot(renderer);
+      break;
+
+    case XtcReaderMenuActivity::MenuAction::GO_HOME:
+      onGoHome();
+      break;
+
+    case XtcReaderMenuActivity::MenuAction::ROTATE_SCREEN:
+      // Applied by the menu handler above, before this switch runs.
+      break;
   }
 }
 
@@ -107,9 +200,12 @@ void XtcReaderActivity::loop() {
     }
   }
 
-  // Enter chapter selection activity
+  // Open the manga menu. Previously this called openChapterSelection() directly,
+  // which returns immediately when a volume has no TOC -- so on a converted CBZ
+  // without chapters, Confirm did nothing at all.
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) || ReaderUtils::isTouchMenuGesture(mappedInput)) {
-    openChapterSelection();
+    openReaderMenu();
+    return;
   }
 
   if (ReaderUtils::handleBackNavigation(mappedInput, activityManager, xtc ? xtc->getPath().c_str() : "",

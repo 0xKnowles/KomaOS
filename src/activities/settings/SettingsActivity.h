@@ -154,6 +154,10 @@ class SettingsActivity final : public Activity {
   ButtonNavigator buttonNavigator;
 
   int selectedCategoryIndex = 0;  // Currently selected category
+  // Tab to open on. onEnter() resets the selection every time the screen is
+  // entered, so the requested tab has to be remembered rather than just
+  // assigned in the constructor.
+  int initialCategoryIndex = 0;
   int selectedSettingIndex = 0;
   int settingsCount = 0;
 
@@ -185,8 +189,14 @@ class SettingsActivity final : public Activity {
   void syncQuickResumeTimeoutForSleepScreen(bool sleepScreenChanged, bool quickResumeTimeoutChanged);
 
  public:
-  explicit SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
-      : Activity("Settings", renderer, mappedInput) {}
+  // Index into categoryNames. Lets a caller open straight onto a tab -- the
+  // manga reader menu uses it so the settings that change what is on screen are
+  // one step away rather than five.
+  static constexpr int MANGA_TAB = 2;
+
+  explicit SettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, int initialCategory = 0)
+      : Activity("Settings", renderer, mappedInput),
+        initialCategoryIndex(initialCategory >= 0 && initialCategory < categoryCount ? initialCategory : 0) {}
   void onEnter() override;
   void onExit() override;
   void loop() override;

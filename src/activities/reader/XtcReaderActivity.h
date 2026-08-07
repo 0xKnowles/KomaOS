@@ -9,8 +9,10 @@
 
 #include <Xtc.h>
 
+#include <cstdint>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "EndOfBookOptions.h"
 #include "activities/Activity.h"
@@ -23,6 +25,10 @@ class XtcReaderActivity final : public Activity {
   // Resolved once in onEnter() from the setting and the file header, rather
   // than per input event: neither input can change while the book is open.
   bool readingRightToLeft = false;
+  // Held in memory for the whole session: the menu needs to know whether the
+  // current page is bookmarked on every open, and re-reading a 258-byte file
+  // for that is a pointless SD round trip.
+  std::vector<uint32_t> bookmarkedPages;
   // Next-book suggestion menu for the End-of-Book screen
   EndOfBookOptions endOfBookOptions;
 
@@ -34,6 +40,11 @@ class XtcReaderActivity final : public Activity {
   };
 
   void renderPage();
+  // Opens the manga menu (Confirm). Replaces the old direct call into chapter
+  // selection, which no-opped on any volume without a TOC.
+  void openReaderMenu();
+  void onReaderMenuConfirm(int action);
+  void toggleBookmarkForCurrentPage();
   // Opens chapter selection when the book has chapters (short-press Confirm); no-op otherwise
   void openChapterSelection();
   void renderStatusBarOverlay(StatusBarOverlayPosition position) const;

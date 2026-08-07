@@ -52,8 +52,7 @@ bool decode(const uint8_t* data, const size_t size, std::vector<uint32_t>& pages
   for (size_t i = 0; i < count; i++) {
     const size_t offset = 2 + i * 4;
     pages.push_back(static_cast<uint32_t>(data[offset]) | (static_cast<uint32_t>(data[offset + 1]) << 8) |
-                    (static_cast<uint32_t>(data[offset + 2]) << 16) |
-                    (static_cast<uint32_t>(data[offset + 3]) << 24));
+                    (static_cast<uint32_t>(data[offset + 2]) << 16) | (static_cast<uint32_t>(data[offset + 3]) << 24));
   }
   return true;
 }

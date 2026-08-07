@@ -118,8 +118,9 @@ void SettingsActivity::rebuildSettingsLists() {
 void SettingsActivity::onEnter() {
   Activity::onEnter();
 
-  // Reset selection to first category
-  selectedCategoryIndex = 0;
+  // Reset selection to the requested category (first, unless a caller asked
+  // for a specific tab).
+  selectedCategoryIndex = initialCategoryIndex;
   selectedSettingIndex = 0;
   preserveQuickResumeTimeoutOn =
       SETTINGS.quickResumeSleepScreen == KomaSettings::QUICK_RESUME_SLEEP_SCREEN::QUICK_RESUME_AFTER_TIMEOUT;
