@@ -7,11 +7,24 @@ Each `*.h` here is a packed 1-bit bitmap compiled into flash and drawn by
 `0` = black ink. Rows are byte-aligned; a width that is not a multiple of 8 is
 padded with white on the right.
 
+## Assets must be stored rotated 90° counter-clockwise
+
+`GfxRenderer::drawImage` rotates the *origin* for the current orientation but
+hands the pixel bytes to the panel unrotated — there is a literal
+`// TODO: Rotate bits` in it. Every asset it draws therefore has to be stored
+pre-rotated, or it appears 90° clockwise on screen.
+
+This is not documented anywhere upstream; it was recovered by comparing the
+shipped `Logo120.h` against its own `Logo120.png`, which match at 0.3% when the
+PNG is rotated 90° CCW and 55.6% when it is not. Pass `--rotate 90` for anything
+`drawImage` will draw. (`drawIcon` is a different path — it plots per pixel and
+does its own `(size-1-row, col)` mapping, so icons are authored upright.)
+
 ## Regenerating a header from a PNG
 
 ```bash
 pip install pillow
-python3 scripts/gen_image_header.py src/images/Logo120.png src/images/Logo120.h Logo120
+python3 scripts/gen_image_header.py src/images/Logo120.png src/images/Logo120.h Logo120 --rotate 90
 ```
 
 Pixels are thresholded at luminance 128. A transparent PNG is flattened onto
@@ -39,6 +52,7 @@ python3 scripts/gen_image_header.py brand/komaos-mark.png src/images/Logo120.h L
 
 | Flag | Effect |
 |---|---|
+| `--rotate N` | rotate counter-clockwise after resizing; **90 is required for anything `drawImage` draws** (see above) |
 | `--trim` | crops the uniform white border before resizing, so the mark fills the slot |
 | `--size WxH` | LANCZOS resize, aspect preserved, padded with white |
 | `--threshold N` | luminance cutoff (default 128) |
@@ -83,9 +97,12 @@ partial-refresh e-ink ghosts badly at this size. Prefer a threshold for logos.
 ```bash
 # 1. Crop the mark out of the lockup (the wordmark is drawn as live text, not baked in).
 # 2. Reduce and threshold:
-python3 scripts/gen_image_header.py brand/komaos-mark.png --size 120x120 --threshold 144 \
-    --preview /tmp/preview.png
+python3 scripts/gen_image_header.py brand/komaos-mark.png src/images/Logo120.h Logo120 \
+    --size 120x120 --threshold 144 --rotate 90 --preview /tmp/preview.png
 ```
+
+The generated header records that exact command in a comment at the top, so a
+regeneration cannot silently drop `--rotate` and ship a sideways logo.
 
 Threshold 144 was chosen off a `--contact-sheet` sweep: it keeps the most tonal
 separation between panels while the white gutters and outlines still survive,
@@ -96,17 +113,12 @@ and loses the K.
 The mark is 731x884, so at 120x120 it is fitted to 99x120 and padded with white
 — the array stays 120x120, which is what both call sites pass to `drawImage`.
 
-**`Logo120.png` is the thresholded 1-bit image itself**, not the full-colour
-master. That makes the header reproducible with no flags:
-
-```bash
-python3 scripts/gen_image_header.py src/images/Logo120.png src/images/Logo120.h Logo120
-```
-
-is a no-op that re-emits byte-identical output. Keep it that way — upstream's
-copies of these two files had silently drifted into different logo revisions,
-and this invariant is what stops that recurring. Edit `brand/` and re-derive,
-never hand-edit either file here.
+**`Logo120.png` is the thresholded 1-bit image, stored upright** so it is
+readable at a glance — it is *not* byte-identical to the header, which is
+rotated. Upstream's two files had drifted into different logo revisions
+precisely because nothing recorded the relationship between them; the
+provenance comment in the header is what records it now. Edit `brand/` and
+re-derive from the recorded command, never hand-edit either file here.
 
 Keep it to 120x120: both call sites centre on that size, and the header costs
 1800 bytes of flash at that resolution.
