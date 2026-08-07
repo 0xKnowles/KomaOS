@@ -32,6 +32,7 @@
 #include "activities/settings/SettingsActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/FullPageLayout.h"
 #include "util/ScreenshotUtil.h"
 #include "util/XtcBookmarks.h"
 #include "util/XtcProgress.h"
@@ -270,17 +271,20 @@ void XtcReaderActivity::loop() {
   const unsigned long heldMs = (touch.prev || touch.next) ? touch.heldMs : mappedInput.getHeldTime();
   const bool skipPages =
       !fromTilt && SETTINGS.longPressButtonBehavior == SETTINGS.CHAPTER_SKIP && heldMs > ReaderUtils::SKIP_HOLD_MS;
-  const int skipAmount = skipPages ? SETTINGS.getMangaSkipPages() : 1;
+  // A turn moves whole pages, which is three strips in Full view. A long-press
+  // skip is already expressed in strips, so it is left alone -- rounding it to
+  // the group would change what the setting means.
+  const int skipAmount = skipPages ? SETTINGS.getMangaSkipPages() : static_cast<int>(pageStep());
 
   if (prevTriggered) {
-    if (currentPage >= static_cast<uint32_t>(skipAmount)) {
-      currentPage -= skipAmount;
-    } else {
-      currentPage = 0;
-    }
+    // Step from the group's first strip, not from wherever inside it the
+    // reader happens to be, so a turn back in Full view lands on a page
+    // boundary rather than drifting off one.
+    const uint32_t from = fullViewActive() ? pageGroupStart() : currentPage;
+    currentPage = from >= static_cast<uint32_t>(skipAmount) ? from - skipAmount : 0;
     requestUpdate();
   } else if (nextTriggered) {
-    currentPage += skipAmount;
+    currentPage = (fullViewActive() ? pageGroupStart() : currentPage) + skipAmount;
     if (currentPage >= xtc->getPageCount()) {
       currentPage = xtc->getPageCount();  // Allow showing "End of book"
     }
@@ -304,7 +308,13 @@ void XtcReaderActivity::render(RenderLock&&) {
     return;
   }
 
-  renderPage();
+  // Full view falls back rather than failing the turn: a layout or allocation
+  // that did not work out should still leave the reader on a readable strip.
+  if (!fullViewActive() || !renderFullPage()) {
+    renderPage();
+  } else {
+    ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh, false, SETTINGS.getMangaRefreshFrequency());
+  }
   saveProgress();
 }
 
@@ -520,6 +530,117 @@ void XtcReaderActivity::renderSideStatusBar() const {
       renderer.fillRect(barX + 1, y + 1, SIDE_BAR_BAR_WIDTH - 2, fillHeight, true);
     }
   }
+}
+
+bool XtcReaderActivity::fullViewActive() const {
+  // Full view only means anything for a volume that was actually split. A
+  // nosplit encode is one strip per page, and reassembling three of those would
+  // stack three unrelated pages.
+  return SETTINGS.mangaViewMode == KomaSettings::MANGA_VIEW_MODE::MANGA_VIEW_FULL &&
+         xtc->getPageCount() >= FullPageLayout::STRIPS_PER_PAGE;
+}
+
+uint32_t XtcReaderActivity::pageStep() const { return fullViewActive() ? FullPageLayout::STRIPS_PER_PAGE : 1; }
+
+uint32_t XtcReaderActivity::pageGroupStart() const {
+  const uint32_t step = pageStep();
+  return (currentPage / step) * step;
+}
+
+bool XtcReaderActivity::renderFullPage() {
+  const uint16_t stripWidth = xtc->getPageWidth();
+  const uint16_t stripHeight = xtc->getPageHeight();
+  const uint8_t bitDepth = xtc->getBitDepth();
+
+  const FullPageLayout::Layout layout =
+      FullPageLayout::plan(stripWidth, stripHeight, renderer.getScreenWidth(), renderer.getScreenHeight(),
+                           SETTINGS.getMangaFullOverlapPercent());
+  if (!layout.valid) {
+    LOG_ERR("XTR", "Full view layout failed for %ux%u strip", stripWidth, stripHeight);
+    return false;
+  }
+
+  const size_t stripBufferSize = (bitDepth == 2) ? xtc::XthPage::payloadSizeFor(stripWidth, stripHeight)
+                                                 : xtc::xtgPayloadSizeFor(stripWidth, stripHeight);
+  // One strip at a time, not three: each is drawn into the framebuffer and
+  // then dropped, so peak use is one strip buffer plus the framebuffer rather
+  // than the ~288KB three XTH strips would need at once.
+  auto stripOwner = makeUniqueNoThrow<uint8_t[]>(stripBufferSize);
+  if (!stripOwner) {
+    LOG_ERR("XTR", "OOM: full-view strip buffer %lu bytes", (unsigned long)stripBufferSize);
+    return false;
+  }
+  uint8_t* strip = stripOwner.get();
+
+  const size_t xtgRowBytes = (stripWidth + 7) / 8;
+  const xtc::XthPage xth{stripWidth, stripHeight};
+
+  renderer.clearScreen();
+
+  const uint32_t firstStrip = pageGroupStart();
+  for (int i = 0; i < FullPageLayout::STRIPS_PER_PAGE; i++) {
+    const FullPageLayout::StripPlacement& placement = layout.strips[i];
+    if (!placement.contributes()) continue;
+
+    const uint32_t stripIndex = firstStrip + static_cast<uint32_t>(i);
+    if (stripIndex >= xtc->getPageCount()) break;
+    if (xtc->loadPage(stripIndex, strip, stripBufferSize) == 0) {
+      LOG_ERR("XTR", "Full view: failed to load strip %lu", (unsigned long)stripIndex);
+      continue;  // Leave that band blank rather than abandoning the whole page.
+    }
+
+    // Ink level 0..3 at a stored strip pixel, whatever the bit depth.
+    const auto levelAt = [&](const int sx, const int sy) -> int {
+      if (bitDepth == 2) {
+        return xth.levelInColumn(xth.columnBase(static_cast<uint16_t>(sx)), static_cast<uint16_t>(sy));
+      }
+      const size_t byte = static_cast<size_t>(sy) * xtgRowBytes + static_cast<size_t>(sx) / 8;
+      // XTG: bit set means white, so invert into an ink level.
+      return ((strip[byte] >> (7 - (sx % 8))) & 1) ? 3 : 0;
+    };
+
+    const int rowsPerDest = FullPageLayout::sourceRowsPerDestRow(placement);
+    const int colsPerDest = std::max(1, stripHeight / std::max(1, layout.dstWidth));
+
+    for (int dy = 0; dy < placement.dstCount; dy++) {
+      // The strip is stored turned, so the page's vertical axis is its X.
+      const int srcX = FullPageLayout::sourceRowFor(placement, dy);
+      const int panelY = placement.dstStart + dy;
+
+      for (int dx = 0; dx < layout.dstWidth; dx++) {
+        const int srcY = static_cast<int>(static_cast<int64_t>(dx) * stripHeight / layout.dstWidth);
+
+        // Box-average the 1-bit source over this output pixel's footprint. The
+        // dither pattern carries local intensity, so averaging recovers an
+        // approximate grey that can be re-dithered at the lower resolution;
+        // point-sampling it instead produces moire on every screentone.
+        int total = 0;
+        int samples = 0;
+        for (int ox = 0; ox < rowsPerDest; ox++) {
+          const int sx = srcX + ox;
+          if (sx >= placement.srcStart + placement.srcCount || sx >= stripWidth) break;
+          for (int oy = 0; oy < colsPerDest; oy++) {
+            const int sy = srcY + oy;
+            if (sy >= stripHeight) break;
+            total += levelAt(sx, sy);
+            samples++;
+          }
+        }
+        if (samples == 0) continue;
+
+        // Ordered dither: no error-diffusion row buffer and no serpentine
+        // state, which keeps this a pure function of position on a page turn
+        // that is already the slowest thing the reader does.
+        static constexpr uint8_t BAYER[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
+        const int mean = (total * 16) / (samples * 3);  // 0..16 white-ness
+        if (mean <= BAYER[panelY & 3][dx & 3]) {
+          renderer.drawPixel(layout.dstLeft + dx, panelY, true);
+        }
+      }
+    }
+  }
+
+  return true;
 }
 
 void XtcReaderActivity::renderPage() {

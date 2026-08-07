@@ -247,6 +247,15 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
         SettingInfo::Enum(StrId::STR_MANGA_SKIP_PAGES, &KomaSettings::mangaSkipPages,
                           {StrId::STR_PAGES_3, StrId::STR_PAGES_6, StrId::STR_PAGES_10, StrId::STR_PAGES_20},
                           "mangaSkipPages", StrId::STR_CAT_MANGA),
+        SettingInfo::Enum(StrId::STR_MANGA_VIEW_MODE, &KomaSettings::mangaViewMode,
+                          {StrId::STR_MANGA_VIEW_SPLIT, StrId::STR_MANGA_VIEW_FULL}, "mangaViewMode",
+                          StrId::STR_CAT_MANGA),
+        // Only meaningful in Full view. Left visible in Split so the value can
+        // be tuned before switching over rather than blind afterwards.
+        SettingInfo::Enum(StrId::STR_MANGA_FULL_OVERLAP, &KomaSettings::mangaFullOverlap,
+                          {StrId::STR_PERCENT_20, StrId::STR_PERCENT_24, StrId::STR_PERCENT_27, StrId::STR_PERCENT_31,
+                           StrId::STR_PERCENT_35},
+                          "mangaFullOverlap", StrId::STR_CAT_MANGA),
 
         // --- Reader ---
         // Built-in font-family entry. Replaced per-call with a registry-aware

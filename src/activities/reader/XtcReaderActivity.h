@@ -40,6 +40,15 @@ class XtcReaderActivity final : public Activity {
   };
 
   void renderPage();
+  // Full view mode: three strips reassembled into one page. Separate from
+  // renderPage because it is a different pipeline -- crop, downscale, re-dither
+  // -- not a variation on blitting one strip 1:1.
+  bool renderFullPage();
+  /** Strips per turn: 3 in Full view, 1 in Split. */
+  uint32_t pageStep() const;
+  /** First strip of the page group `currentPage` falls in. */
+  uint32_t pageGroupStart() const;
+  bool fullViewActive() const;
   // Opens the manga menu (Confirm). Replaces the old direct call into chapter
   // selection, which no-opped on any volume without a TOC.
   void openReaderMenu();

@@ -325,6 +325,15 @@ int KomaSettings::getMangaRefreshFrequency() const {
   }
 }
 
+int KomaSettings::getMangaFullOverlapPercent() const {
+  // Bounds-checked rather than indexed blind: mangaFullOverlap comes from
+  // settings.json, which a user or an older build can put anything in.
+  if (mangaFullOverlap >= MANGA_OVERLAP_COUNT) {
+    return mangaFullOverlapPercentValues[MANGA_OVERLAP_27];
+  }
+  return mangaFullOverlapPercentValues[mangaFullOverlap];
+}
+
 int KomaSettings::getMangaSkipPages() const {
   switch (mangaSkipPages) {
     case MANGA_SKIP_3:

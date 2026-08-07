@@ -71,6 +71,19 @@ class KomaSettings : public PersistableStore<KomaSettings> {
     MANGA_SKIP_20 = 3,
     MANGA_SKIP_PAGES_COUNT
   };
+  enum MANGA_VIEW_MODE { MANGA_VIEW_SPLIT = 0, MANGA_VIEW_FULL = 1, MANGA_VIEW_MODE_COUNT };
+  // Spread around the 25-31% that overlapSegments produces on typical manga
+  // aspect ratios, with room either side for unusual pages.
+  enum MANGA_OVERLAP {
+    MANGA_OVERLAP_20 = 0,
+    MANGA_OVERLAP_24 = 1,
+    MANGA_OVERLAP_27 = 2,
+    MANGA_OVERLAP_31 = 3,
+    MANGA_OVERLAP_35 = 4,
+    MANGA_OVERLAP_COUNT
+  };
+  static constexpr uint8_t mangaFullOverlapPercentValues[MANGA_OVERLAP_COUNT] = {20, 24, 27, 31, 35};
+
   enum XTC_STATUS_BAR_MODE {
     XTC_STATUS_BAR_HIDE = 0,
     XTC_STATUS_BAR_BOTTOM = 1,
@@ -226,6 +239,16 @@ class KomaSettings : public PersistableStore<KomaSettings> {
   uint8_t mangaRefreshFrequency = MANGA_REFRESH_FOLLOW_GLOBAL;
   // Pages jumped per long-press in the XTC reader. Was hard-coded to 10.
   uint8_t mangaSkipPages = MANGA_SKIP_10;
+  // How a split volume is shown. SPLIT is the encoder's own output, one strip
+  // per turn. FULL reassembles three strips into a page for orientation; it is
+  // necessarily softer, since it re-dithers art that was already dithered.
+  uint8_t mangaViewMode = MANGA_VIEW_SPLIT;
+  // Overlap between consecutive strips, as a percentage of one strip, used by
+  // FULL to crop the duplication out. A setting rather than a file field
+  // because the encoder derives the overlap from the original page's aspect
+  // ratio and does not record it; see FullPageLayout.h. Index into
+  // mangaFullOverlapPercentValues, not the percentage itself.
+  uint8_t mangaFullOverlap = MANGA_OVERLAP_27;
   // Clock display in status bar (X3 only, requires DS3231 RTC)
   uint8_t statusBarClock = STATUS_BAR_CLOCK_HIDE;
   // Clock UTC offset in quarter-hour steps, biased by 48 so it fits in uint8_t.
@@ -394,6 +417,8 @@ class KomaSettings : public PersistableStore<KomaSettings> {
   // Full-refresh cadence to use in the manga reader, resolving FOLLOW_GLOBAL.
   int getMangaRefreshFrequency() const;
   int getMangaSkipPages() const;
+  /** Strip overlap as a percentage, resolved from the mangaFullOverlap index. */
+  int getMangaFullOverlapPercent() const;
 };
 
 // Helper macro to access settings
