@@ -517,12 +517,14 @@ uint8_t Xtc::getReadDirection() const {
   if (!loaded || !parser) {
     return 0;
   }
-
-  xtc::XtcSplitGeometry Xtc::getSplitGeometry() const {
-    if (!loaded || !parser) return {};
-    return parser->getSplitGeometry();
-  }
   return parser->getReadDirection();
+}
+
+xtc::XtcSplitGeometry Xtc::getSplitGeometry() const {
+  if (!loaded || !parser) {
+    return {};
+  }
+  return parser->getSplitGeometry();
 }
 
 uint8_t Xtc::getBitDepth() const {
