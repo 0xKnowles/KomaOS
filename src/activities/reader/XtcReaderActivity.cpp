@@ -510,7 +510,11 @@ void XtcReaderActivity::renderSplitStatusBar(const StatusBarOverlayPosition posi
           bytes += width;
           chars++;
         }
-        title = title.substr(0, bytes) + "\xE2\x80\xA6";
+        // resize-then-append rather than substr: assigning a prefix of a string
+        // back to itself builds a whole temporary to do it, which is both a
+        // cppcheck defect (uselessCallsSubstr) and a pointless allocation here.
+        title.resize(bytes);
+        title += "\xE2\x80\xA6";
       } else {
         title = renderer.truncatedText(SMALL_FONT_ID, title.c_str(), available);
       }
