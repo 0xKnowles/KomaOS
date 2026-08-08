@@ -184,9 +184,6 @@ void HomeActivity::loop() {
       case HomeMenuItem::MANGA:
         onMangaOpen();
         break;
-      case HomeMenuItem::OPDS_BROWSER:
-        onOpdsBrowserOpen();
-        break;
       case HomeMenuItem::FILE_TRANSFER:
         onFileTransferOpen();
         break;
@@ -302,9 +299,8 @@ void HomeActivity::render(RenderLock&&) {
 
   // Kept in the order of MENU_ORDER -- the switch in activateSelection maps by
   // index, so the two lists have to agree.
-  std::vector<const char*> menuItems = {tr(STR_BOOKS), tr(STR_MANGA), tr(STR_FILE_TRANSFER), tr(STR_SETTINGS_TITLE),
-                                        tr(STR_OPDS_BROWSER)};
-  std::vector<UIIcon> menuIcons = {Folder, Library, Transfer, Settings, Wifi};
+  std::vector<const char*> menuItems = {tr(STR_BOOKS), tr(STR_MANGA), tr(STR_FILE_TRANSFER), tr(STR_SETTINGS_TITLE)};
+  std::vector<UIIcon> menuIcons = {Folder, Library, Transfer, Settings};
 
   if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
     // Insert Continue Reading at the top if enabled in theme
@@ -353,5 +349,3 @@ void HomeActivity::onMangaOpen() { activityManager.goToFileBrowser(MANGA_PATH); 
 void HomeActivity::onSettingsOpen() { activityManager.goToSettings(); }
 
 void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
-
-void HomeActivity::onOpdsBrowserOpen() { activityManager.goToBrowser(); }

@@ -10,16 +10,14 @@ class GfxRenderer;
 /**
  * KomaUI: the home screen as a page of manga panels.
  *
- * A hero cover with two smaller panels stacked beside it and a stats koma
- * closing the block. Panel edges are slanted a few pixels and no two lean the
- * same way, so the block reads as inked panels rather than a table -- which is
- * what the earlier grid versions of this theme kept looking like.
+ * Three portrait cover slots across the top, a stats koma under them, and four
+ * menu bars below that -- all of it ink from src/images/KomaBackground.h, with
+ * this theme drawing only the art and text that lands inside.
  *
- * The slant lives in the borders. drawBitmap cannot rotate, so cover art is
- * drawn upright across each panel's bounding box and then masked back to its
- * quad; real koma hold upright art inside tilted frames anyway. The masking is
- * per-row, which is why the composed block is cached and only the selection
- * bracket and stats panel are redrawn as the selector moves.
+ * The slots are ~0.40 aspect where a manga cover is ~0.70, so a cover is
+ * width-limited in them and leaves vertical slack. That slack is where the
+ * series name and volume go; see drawPanel in the .cpp for why the layout is
+ * driven by which slack dimension is larger rather than by a fixed split.
  *
  * The stats koma reports the selected volume, not a library total: the recent
  * list this theme is handed is already capped and collapsed to one entry per
@@ -52,21 +50,33 @@ struct Panel {
   constexpr int bottom() const { return y + h; }
 };
 
-constexpr Panel BANNER{30, 42, 420, 55};
-constexpr Panel HERO{27, 105, 219, 229};
-constexpr Panel SIDE_TOP{246, 95, 205, 112};
-constexpr Panel SIDE_BOTTOM{252, 216, 201, 111};
-constexpr Panel STATS{30, 338, 422, 74};
-
-constexpr int MENU_ROWS = 5;
-constexpr Panel MENU[MENU_ROWS] = {
-    {28, 413, 420, 58}, {28, 472, 424, 66}, {29, 539, 423, 58}, {28, 598, 424, 58}, {28, 658, 424, 59},
+/** Three portrait cover slots across the top. */
+constexpr int PANEL_COUNT = 3;
+constexpr Panel COVER[PANEL_COUNT] = {
+    {16, 40, 121, 305},
+    {183, 40, 116, 305},
+    {343, 40, 119, 305},
 };
 
-/** Hero plus the two panels beside it. */
-constexpr int PANEL_COUNT = 3;
-/** Thumbnails are generated at the hero's height, the largest slot. */
-constexpr int COVER_HEIGHT = HERO.h;
+constexpr Panel STATS{18, 372, 443, 118};
+
+constexpr int MENU_ROWS = 4;
+constexpr Panel MENU[MENU_ROWS] = {
+    {18, 508, 443, 43},
+    {18, 565, 443, 40},
+    {18, 621, 444, 55},
+    {18, 694, 444, 63},
+};
+
+/**
+ * Thumbnail height.
+ *
+ * The cover slots are ~0.40 aspect, narrower than a manga cover's ~0.70, so a
+ * cover is width-limited in them: 121px of slot width takes about 173px of
+ * height. Generating at 180 keeps the draw close to 1:1 rather than resampling a
+ * 305-tall thumbnail down by half.
+ */
+constexpr int COVER_HEIGHT = 180;
 /** Inset of text from a panel's inked border. */
 constexpr int PAD = 8;
 
@@ -74,7 +84,8 @@ constexpr int PORTRAIT_PANEL_HEIGHT = 800;
 static_assert(MENU[MENU_ROWS - 1].bottom() <= PORTRAIT_PANEL_HEIGHT - LyraMetrics::values.buttonHintsHeight,
               "The background's last menu row overlaps the button hints.");
 static_assert(STATS.bottom() <= MENU[0].y, "The stats panel overlaps the first menu row.");
-static_assert(HERO.right() <= SIDE_TOP.x, "The hero panel overlaps the side column.");
+static_assert(COVER[PANEL_COUNT - 1].bottom() <= STATS.y, "A cover slot overlaps the stats panel.");
+static_assert(COVER[0].right() <= COVER[1].x && COVER[1].right() <= COVER[2].x, "The cover slots overlap.");
 
 constexpr ThemeMetrics values = [] {
   ThemeMetrics v = LyraMetrics::values;
@@ -82,13 +93,18 @@ constexpr ThemeMetrics values = [] {
   // The theme paints the whole page, so it takes the whole page as its rect
   // and HomeActivity is left with nothing to position.
   v.homeTopPadding = 0;
+  // Everything above the first menu bar -- covers and the stats koma -- is the
+  // cover tile as far as HomeActivity is concerned. It only uses this to place
+  // the menu below and to hit-test a tap on the shelf.
   v.homeCoverTileHeight = MENU[0].y;
   v.homeMenuTopOffset = 0;
-  // Kept in step with the drawn rows so selection and touch land where the ink
-  // is. The rows are hand-drawn and not evenly pitched; drawButtonMenu places
-  // labels at their measured positions rather than deriving them from these.
-  v.menuRowHeight = MENU[0].h;
-  v.menuSpacing = MENU[1].y - MENU[0].bottom();
+  // HomeActivity hit-tests menu taps on a uniform pitch from homeCoverTileHeight,
+  // but the drawn bars are hand-inked and not evenly spaced (rows start at 508,
+  // 565, 621, 694). A pitch of 62 with a 40px band is the fit that puts all four
+  // bands inside their own bar; drawButtonMenu still draws labels at the measured
+  // positions rather than deriving them from these.
+  v.menuRowHeight = 40;
+  v.menuSpacing = 22;
   v.homeRecentBooksCount = PANEL_COUNT;
   v.homeGroupRecentsBySeries = true;
   return v;

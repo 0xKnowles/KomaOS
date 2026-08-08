@@ -32,15 +32,19 @@ class HomeActivity final : public Activity {
   std::vector<RecentBook> recentBooks;
   const HomeMenuItem initialMenuItem;
 
-  // The menu is a fixed list. OPDS used to be inserted only when a server was
-  // configured, which made the row order depend on runtime state; it now always
-  // sits last and opens the server list, where an empty store offers "add
-  // server" rather than a dead end. KomaUI's background inks exactly MENU_COUNT
-  // rows, so a list that changes length leaves an empty box on the page.
-  static constexpr int MENU_COUNT = 5;
+  // The menu is a fixed list. OPDS used to be inserted here only when a server
+  // was configured, which made the row order depend on runtime state and left
+  // themes that ink a fixed number of rows with an empty box; it now lives in
+  // Settings > System, its only other entry point, and is gone from here.
+  // HomeMenuItem::OPDS_BROWSER is still passed to goHome() when returning from
+  // the OPDS browser -- menuItemToIndex falls back to row 0 for anything not in
+  // this list, so that highlights Books rather than misindexing.
+  static constexpr int MENU_COUNT = 4;
   static constexpr HomeMenuItem MENU_ORDER[MENU_COUNT] = {
-      HomeMenuItem::BOOKS,         HomeMenuItem::MANGA,        HomeMenuItem::FILE_TRANSFER,
-      HomeMenuItem::SETTINGS_MENU, HomeMenuItem::OPDS_BROWSER,
+      HomeMenuItem::BOOKS,
+      HomeMenuItem::MANGA,
+      HomeMenuItem::FILE_TRANSFER,
+      HomeMenuItem::SETTINGS_MENU,
   };
 
   // Convert HomeMenuItem to menu index (used in onEnter)
@@ -61,7 +65,6 @@ class HomeActivity final : public Activity {
   void onMangaOpen();
   void onSettingsOpen();
   void onFileTransferOpen();
-  void onOpdsBrowserOpen();
 
   int getMenuItemCount() const;
   bool storeCoverBuffer();    // Store frame buffer for cover image
