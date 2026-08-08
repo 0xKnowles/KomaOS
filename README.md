@@ -11,8 +11,8 @@
 [![Platform](https://img.shields.io/badge/platform-ESP32--C3-red?style=for-the-badge&logo=espressif)](https://www.espressif.com/en/products/socs/esp32-c3)
 [![Hardware](https://img.shields.io/badge/hardware-Xteink%20X3%20%7C%20X4-lightgrey?style=for-the-badge)](https://www.xteink.com/)
 
-<img src="./docs/images/cover.jpg" alt="KomaOS running on an Xteink X4" width="620">
-
+<img src="./brand/Home.png" alt="KomaOS Home on an Xteink X4" width="300">
+<img src="./brand/Settings.png" alt="KomaOS settings on an Xteink X4" width="300">
 </div>
 
 ---
@@ -27,6 +27,18 @@ The ESP32-C3 cannot decode a full-resolution JPEG per page turn inside a 380 KB 
 does not try. Pages are pre-rendered off-device into **XTC/XTCH** — 1-bit or 2-bit grayscale at panel
 resolution — and a page turn costs a decode-free blit.
 
+<div align="center">
+<img src="./brand/Full_1.png" alt="KomaOS settings on an Xteink X4" width="300">
+<img src="./brand/Full_2.png" alt="KomaOS settings on an Xteink X4" width="300">
+<img src="./brand/Full_3.png" alt="KomaOS settings on an Xteink X4" width="300">
+</div>
+
+<div align="center">
+<img src="./brand/Slice_1.png" alt="KomaOS settings on an Xteink X4" width="600">
+</div>
+<div align="center">
+<img src="./brand/Slice_2.png" alt="KomaOS settings on an Xteink X4" width="600">
+</div>
 ## Highlights
 
 | | |
