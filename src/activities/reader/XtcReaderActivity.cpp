@@ -52,6 +52,12 @@ constexpr int SIDE_BAR_MAX_WIDTH = 52;
 constexpr int SIDE_BAR_BAR_WIDTH = 7;
 /** Square marking a bookmarked page. */
 constexpr int SIDE_BAR_BOOKMARK_SIZE = 7;
+/** Thickness of the Split-view progress hairline, flush to the panel edge. */
+constexpr int SPLIT_BAR_HEIGHT = 3;
+/** Gap between that hairline and the title. */
+constexpr int SPLIT_BAR_GAP = 3;
+/** Side inset for the Split-view title, so it never touches the panel edge. */
+constexpr int SPLIT_TEXT_MARGIN = 8;
 
 }  // namespace
 
@@ -397,6 +403,16 @@ void XtcReaderActivity::renderStatusBarOverlay(const StatusBarOverlayPosition po
     return;
   }
 
+  // Split view gets a deliberately minimal bar: the strip is the page, drawn
+  // edge to edge, and counts, battery and percentages all eat into it for
+  // information the reader can get from the menu. Title plus a progress hairline
+  // is what is worth the height. Full view keeps the full bar -- a reassembled
+  // page is already letterboxed, so the room is there.
+  if (!fullViewActive()) {
+    renderSplitStatusBar(position);
+    return;
+  }
+
   const int statusBarHeight = UITheme::getInstance().getStatusBarHeight();
   if (statusBarHeight <= 0) {
     return;
@@ -438,6 +454,82 @@ void XtcReaderActivity::renderStatusBarOverlay(const StatusBarOverlayPosition po
   const bool turnGlyphs = sb.xtcMode == KomaSettings::XTC_STATUS_BAR_MODE::XTC_STATUS_BAR_BOTTOM;
   GUI.drawStatusBar(renderer, progress, pageInfo.currentPage, pageInfo.pageCount, pageInfo.title, paddingBottom, 0,
                     true, false, false, turnGlyphs);
+}
+
+void XtcReaderActivity::renderSplitStatusBar(const StatusBarOverlayPosition position) const {
+  const auto sb = SETTINGS.statusBarSpec();
+  // Bottom turns its glyphs a quarter turn to match pre-rotated artwork; Top
+  // does not. Whichever applies has to be used for measuring as well as
+  // drawing, which is the bug that let the title run off the panel: it was
+  // measured turned and truncated against the horizontal width.
+  const bool turnGlyphs = position == StatusBarOverlayPosition::Bottom;
+  const auto textExtent = [this, turnGlyphs](const char* text) {
+    return turnGlyphs ? renderer.getTurnedTextExtent(SMALL_FONT_ID, text) : renderer.getTextWidth(SMALL_FONT_ID, text);
+  };
+
+  const int screenWidth = renderer.getScreenWidth();
+  const int screenHeight = renderer.getScreenHeight();
+  const int lineHeight = renderer.getLineHeight(SMALL_FONT_ID);
+
+  // Against the very outer edge of the panel, not the oriented margin: the page
+  // is drawn edge to edge, so a bar inset by the margin floats in a band of
+  // cleared white instead of reading as a rule along the screen's edge.
+  const int barY = position == StatusBarOverlayPosition::Bottom ? screenHeight - SPLIT_BAR_HEIGHT : 0;
+  const int textY = position == StatusBarOverlayPosition::Bottom ? barY - SPLIT_BAR_GAP - lineHeight
+                                                                 : SPLIT_BAR_HEIGHT + SPLIT_BAR_GAP;
+
+  const int clearY = position == StatusBarOverlayPosition::Bottom ? textY - SPLIT_BAR_GAP : 0;
+  const int clearHeight =
+      position == StatusBarOverlayPosition::Bottom ? screenHeight - clearY : textY + lineHeight + SPLIT_BAR_GAP;
+  renderer.fillRect(0, std::max(0, clearY), screenWidth, clearHeight, false);
+
+  std::string title = getStatusBarInfo().title;
+  if (!title.empty()) {
+    // Truncate against the metric the glyphs will actually be drawn with.
+    // getTurnedTextExtent charges one line height per character, so a turned
+    // title fits far fewer characters than its horizontal width suggests.
+    const int available = screenWidth - 2 * SPLIT_TEXT_MARGIN;
+    if (textExtent(title.c_str()) > available && available > 0) {
+      if (turnGlyphs) {
+        // One line height per glyph means the budget is a character count. Cut
+        // on a UTF-8 boundary so a multi-byte character is not split in half.
+        const size_t maxChars = lineHeight > 0 ? static_cast<size_t>(available / lineHeight) : 0;
+        size_t chars = 0;
+        size_t bytes = 0;
+        while (bytes < title.size() && chars + 1 < maxChars) {
+          const auto lead = static_cast<uint8_t>(title[bytes]);
+          size_t width = 1;
+          if ((lead & 0xF8) == 0xF0) {
+            width = 4;
+          } else if ((lead & 0xF0) == 0xE0) {
+            width = 3;
+          } else if ((lead & 0xE0) == 0xC0) {
+            width = 2;
+          }
+          if (bytes + width > title.size()) break;
+          bytes += width;
+          chars++;
+        }
+        title = title.substr(0, bytes) + "\xE2\x80\xA6";
+      } else {
+        title = renderer.truncatedText(SMALL_FONT_ID, title.c_str(), available);
+      }
+    }
+    const int titleX = std::max(SPLIT_TEXT_MARGIN, (screenWidth - textExtent(title.c_str())) / 2);
+    if (turnGlyphs) {
+      renderer.drawTextGlyphsTurned(SMALL_FONT_ID, titleX, textY, title.c_str());
+    } else {
+      renderer.drawText(SMALL_FONT_ID, titleX, textY, title.c_str());
+    }
+  }
+
+  // Always book progress, never chapter: the bar is the only progress readout
+  // left in this mode, so it should mean the same thing in every volume.
+  const int pageCount = static_cast<int>(xtc->getPageCount());
+  const int bookPercent = pageCount > 0 ? (static_cast<int>(currentPage) + 1) * 100 / pageCount : 0;
+  if (sb.showsProgressBar()) {
+    renderer.fillRect(0, barY, screenWidth * std::clamp(bookPercent, 0, 100) / 100, SPLIT_BAR_HEIGHT, true);
+  }
 }
 
 void XtcReaderActivity::renderSideStatusBar() const {
@@ -599,7 +691,7 @@ uint32_t XtcReaderActivity::leadingStripCount() const {
   // The setting shifts this so a reader can correct that volume without a
   // re-export. Clamped at zero: a negative lead-in has no meaning, and the
   // count is compared against unsigned page indices.
-  const int shifted = static_cast<int>(xtc->getSplitGeometry().leadingStrips) + SETTINGS.getMangaSliceOffset();
+  const int shifted = static_cast<int>(xtc->getSplitGeometry().leadingStrips) + sliceOffset;
   return static_cast<uint32_t>(std::max(0, shifted));
 }
 
@@ -917,13 +1009,23 @@ void XtcReaderActivity::saveProgress() const {
   // The page count rides along so the home screen can show progress for a
   // volume it is not reading, without opening the XTC to find out how long it
   // is. See XtcProgress.h.
-  if (!XtcProgress::write(xtc->getCachePath(), currentPage, xtc->getPageCount())) {
+  if (!XtcProgress::write(xtc->getCachePath(), currentPage, xtc->getPageCount(), sliceOffset)) {
     LOG_ERR("XTR", "Failed to save progress: page %lu", currentPage);
   }
 }
 
 void XtcReaderActivity::loadProgress() {
   const XtcProgress::Snapshot saved = XtcProgress::read(xtc->getCachePath());
+
+  // How the global setting and the per-book memory resolve: a setting left on
+  // AUTO means "no manual override", so the volume's own remembered value
+  // stands. Setting it to anything else is a deliberate act on the volume in
+  // front of you, so it wins and is written back as that volume's value on the
+  // next save. Leaving it on AUTO afterwards is what makes the correction stick
+  // to the book rather than to the reader.
+  const int setting = SETTINGS.getMangaSliceOffset();
+  sliceOffset = setting != 0 ? setting : (saved.hasSliceOffset ? static_cast<int>(saved.sliceOffset) : 0);
+
   if (!saved.valid) {
     return;
   }

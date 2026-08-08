@@ -83,13 +83,17 @@ class KomaSettings : public PersistableStore<KomaSettings> {
     MANGA_OVERLAP_COUNT
   };
   static constexpr uint8_t mangaFullOverlapPercentValues[MANGA_OVERLAP_COUNT] = {20, 24, 27, 31, 35};
-  // Shift applied to the file's own lead-in strip count when Full view groups
-  // strips into pages. A volume whose front matter is not what the encoder
-  // recorded -- an extra full-page plate after the cover, say -- groups one
-  // strip out of step, and every page after it is a mix of two. AUTO trusts the
-  // file, which is right for most volumes; the rest let a reader correct one
-  // that is not. The range covers a full grouping cycle either way, plus room
-  // for a couple of extra standalone plates.
+  // Manual override for the Full-view lead-in correction. A volume whose front
+  // matter is not what the encoder recorded -- an extra full-page plate after
+  // the cover, say -- groups one strip out of step, and every page after it is
+  // a mix of two.
+  //
+  // AUTO means "no override": the volume uses whatever correction is remembered
+  // for it in its own progress.bin, so a shelf of books needing different values
+  // each keep theirs. Any other value applies to the volume being read and is
+  // written back as its remembered value, so the way to fix one book is to set
+  // it, then return this to AUTO. The range covers a full grouping cycle either
+  // way, plus room for a couple of extra standalone plates.
   enum MANGA_SLICE_OFFSET {
     MANGA_SLICE_MINUS_3 = 0,
     MANGA_SLICE_MINUS_2 = 1,

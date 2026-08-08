@@ -24,7 +24,8 @@ int Snapshot::percent() const {
   return static_cast<int>((static_cast<uint64_t>(pagesRead) * 100) / pageCount);
 }
 
-size_t encode(const uint32_t page, const uint32_t pageCount, uint8_t* out, const size_t outSize) {
+size_t encode(const uint32_t page, const uint32_t pageCount, const int32_t sliceOffset, uint8_t* out,
+              const size_t outSize) {
   if (out == nullptr || outSize < CURRENT_SIZE) {
     return 0;
   }
@@ -38,6 +39,13 @@ size_t encode(const uint32_t page, const uint32_t pageCount, uint8_t* out, const
   out[5] = static_cast<uint8_t>((pageCount >> 8) & 0xFF);
   out[6] = static_cast<uint8_t>((pageCount >> 16) & 0xFF);
   out[7] = static_cast<uint8_t>((pageCount >> 24) & 0xFF);
+  // Cast through uint32_t before shifting: right-shifting a negative signed
+  // value is implementation-defined, and the offset is routinely negative.
+  const uint32_t offsetBits = static_cast<uint32_t>(sliceOffset);
+  out[8] = static_cast<uint8_t>(offsetBits & 0xFF);
+  out[9] = static_cast<uint8_t>((offsetBits >> 8) & 0xFF);
+  out[10] = static_cast<uint8_t>((offsetBits >> 16) & 0xFF);
+  out[11] = static_cast<uint8_t>((offsetBits >> 24) & 0xFF);
   return CURRENT_SIZE;
 }
 
@@ -51,9 +59,16 @@ Snapshot decode(const uint8_t* data, const size_t size) {
                   (static_cast<uint32_t>(data[2]) << 16) | (static_cast<uint32_t>(data[3]) << 24);
   snapshot.valid = true;
 
-  if (size >= CURRENT_SIZE) {
+  if (size >= PAGE_COUNT_SIZE) {
     snapshot.pageCount = static_cast<uint32_t>(data[4]) | (static_cast<uint32_t>(data[5]) << 8) |
                          (static_cast<uint32_t>(data[6]) << 16) | (static_cast<uint32_t>(data[7]) << 24);
+  }
+
+  if (size >= CURRENT_SIZE) {
+    const uint32_t offsetBits = static_cast<uint32_t>(data[8]) | (static_cast<uint32_t>(data[9]) << 8) |
+                                (static_cast<uint32_t>(data[10]) << 16) | (static_cast<uint32_t>(data[11]) << 24);
+    snapshot.sliceOffset = static_cast<int32_t>(offsetBits);
+    snapshot.hasSliceOffset = true;
   }
   return snapshot;
 }
@@ -84,9 +99,9 @@ Snapshot read(const std::string& cachePath) {
   return decode(buffer, bytesRead);
 }
 
-bool write(const std::string& cachePath, const uint32_t page, const uint32_t pageCount) {
+bool write(const std::string& cachePath, const uint32_t page, const uint32_t pageCount, const int32_t sliceOffset) {
   uint8_t buffer[CURRENT_SIZE];
-  const size_t written = encode(page, pageCount, buffer, sizeof(buffer));
+  const size_t written = encode(page, pageCount, sliceOffset, buffer, sizeof(buffer));
   if (written == 0) {
     LOG_ERR("XPR", "Failed to encode progress: page %lu/%lu", static_cast<unsigned long>(page),
             static_cast<unsigned long>(pageCount));

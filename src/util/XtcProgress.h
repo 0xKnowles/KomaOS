@@ -13,6 +13,12 @@
  *
  *   [0..3]  current page index, little-endian, 0-based
  *   [4..7]  page count for the volume, little-endian
+ *   [8..11] Full-view slice offset for this volume, little-endian, signed
+ *
+ * The slice offset is per-volume because the correction it applies is a
+ * property of the file's front matter, not of the reader: a shelf holds books
+ * that need different values, and a single global setting means re-entering it
+ * on every switch.
  *
  * Files written by older firmware are 4 bytes and still load -- they simply
  * report no page count, and callers show a placeholder rather than a wrong
@@ -34,8 +40,10 @@ namespace XtcProgress {
 
 /** Layout written by older firmware: page index only. Read, never written. */
 constexpr size_t LEGACY_SIZE = 4;
-/** Current layout: page index followed by the volume's page count. */
-constexpr size_t CURRENT_SIZE = 8;
+/** Second layout: page index and page count. Read, never written. */
+constexpr size_t PAGE_COUNT_SIZE = 8;
+/** Current layout: the above plus this volume's Full-view slice offset. */
+constexpr size_t CURRENT_SIZE = 12;
 
 /** Returned by percent() when the page count is unknown. */
 constexpr int UNKNOWN_PERCENT = -1;
@@ -47,6 +55,15 @@ struct Snapshot {
   uint32_t pageCount = 0;
   /** False when there was no readable progress at all. */
   bool valid = false;
+  /**
+   * Full-view lead-in correction remembered for this volume.
+   *
+   * Only meaningful when hasSliceOffset is set; a file written before the field
+   * existed leaves it at zero, which is not the same as a stored zero.
+   */
+  int32_t sliceOffset = 0;
+  /** True when the file actually carried a slice offset. */
+  bool hasSliceOffset = false;
 
   bool hasPageCount() const { return valid && pageCount > 0; }
 
@@ -60,11 +77,11 @@ struct Snapshot {
 };
 
 /**
- * Serialises `page` and `pageCount` into `out`.
+ * Serialises `page`, `pageCount` and `sliceOffset` into `out`.
  *
  * Returns the number of bytes written, or 0 if `out` is null or too small.
  */
-size_t encode(uint32_t page, uint32_t pageCount, uint8_t* out, size_t outSize);
+size_t encode(uint32_t page, uint32_t pageCount, int32_t sliceOffset, uint8_t* out, size_t outSize);
 
 /** Parses either layout. A short or null buffer yields an invalid Snapshot. */
 Snapshot decode(const uint8_t* data, size_t size);
@@ -84,7 +101,7 @@ std::string cachePathFor(const std::string& bookPath);
 Snapshot read(const std::string& cachePath);
 
 /** Writes progress atomically (temp-then-rename, via ProgressFile). */
-bool write(const std::string& cachePath, uint32_t page, uint32_t pageCount);
+bool write(const std::string& cachePath, uint32_t page, uint32_t pageCount, int32_t sliceOffset);
 
 #endif  // XTC_PROGRESS_HOST_TEST
 

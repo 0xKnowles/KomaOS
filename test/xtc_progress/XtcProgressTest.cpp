@@ -20,7 +20,7 @@ using XtcProgress::Snapshot;
 
 TEST(XtcProgress, RoundTripsPageAndPageCount) {
   uint8_t buffer[XtcProgress::CURRENT_SIZE];
-  ASSERT_EQ(encode(87, 210, buffer, sizeof(buffer)), XtcProgress::CURRENT_SIZE);
+  ASSERT_EQ(encode(87, 210, 0, buffer, sizeof(buffer)), XtcProgress::CURRENT_SIZE);
 
   const Snapshot decoded = decode(buffer, sizeof(buffer));
   EXPECT_TRUE(decoded.valid);
@@ -32,7 +32,7 @@ TEST(XtcProgress, RoundTripsValuesPastOneByte) {
   // A long volume exercises every byte of both fields; a truncating shift bug
   // would survive any single-byte page number.
   uint8_t buffer[XtcProgress::CURRENT_SIZE];
-  ASSERT_EQ(encode(0x01020304u, 0x0A0B0C0Du, buffer, sizeof(buffer)), XtcProgress::CURRENT_SIZE);
+  ASSERT_EQ(encode(0x01020304u, 0x0A0B0C0Du, 0, buffer, sizeof(buffer)), XtcProgress::CURRENT_SIZE);
 
   const Snapshot decoded = decode(buffer, sizeof(buffer));
   EXPECT_EQ(decoded.page, 0x01020304u);
@@ -41,9 +41,9 @@ TEST(XtcProgress, RoundTripsValuesPastOneByte) {
 
 TEST(XtcProgress, WritesLittleEndianRegardlessOfHost) {
   uint8_t buffer[XtcProgress::CURRENT_SIZE];
-  ASSERT_EQ(encode(0x04030201u, 0x08070605u, buffer, sizeof(buffer)), XtcProgress::CURRENT_SIZE);
+  ASSERT_EQ(encode(0x04030201u, 0x08070605u, 0x0C0B0A09, buffer, sizeof(buffer)), XtcProgress::CURRENT_SIZE);
 
-  const uint8_t expected[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+  const uint8_t expected[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C};
   for (size_t i = 0; i < sizeof(expected); i++) {
     EXPECT_EQ(buffer[i], expected[i]) << "byte " << i;
   }
@@ -51,10 +51,48 @@ TEST(XtcProgress, WritesLittleEndianRegardlessOfHost) {
 
 TEST(XtcProgress, RefusesToEncodeIntoATooSmallBuffer) {
   uint8_t buffer[XtcProgress::CURRENT_SIZE] = {0xFF};
-  EXPECT_EQ(encode(1, 2, buffer, XtcProgress::CURRENT_SIZE - 1), 0u);
-  EXPECT_EQ(encode(1, 2, nullptr, sizeof(buffer)), 0u);
+  EXPECT_EQ(encode(1, 2, 0, buffer, XtcProgress::CURRENT_SIZE - 1), 0u);
+  EXPECT_EQ(encode(1, 2, 0, nullptr, sizeof(buffer)), 0u);
   // The buffer must be left alone on refusal, not half-written.
   EXPECT_EQ(buffer[0], 0xFF);
+}
+
+TEST(XtcProgress, RoundTripsANegativeSliceOffset) {
+  // The offset is routinely negative, and a right shift on a negative signed
+  // value is implementation-defined -- encode casts through uint32_t for that
+  // reason, so this is the test that would catch losing the cast.
+  uint8_t buffer[XtcProgress::CURRENT_SIZE];
+  ASSERT_EQ(encode(5, 300, -3, buffer, sizeof(buffer)), XtcProgress::CURRENT_SIZE);
+
+  const Snapshot decoded = decode(buffer, sizeof(buffer));
+  EXPECT_TRUE(decoded.hasSliceOffset);
+  EXPECT_EQ(decoded.sliceOffset, -3);
+  EXPECT_EQ(decoded.page, 5u);
+  EXPECT_EQ(decoded.pageCount, 300u);
+}
+
+TEST(XtcProgress, RoundTripsAPositiveSliceOffset) {
+  uint8_t buffer[XtcProgress::CURRENT_SIZE];
+  ASSERT_EQ(encode(0, 10, 2, buffer, sizeof(buffer)), XtcProgress::CURRENT_SIZE);
+
+  const Snapshot decoded = decode(buffer, sizeof(buffer));
+  EXPECT_TRUE(decoded.hasSliceOffset);
+  EXPECT_EQ(decoded.sliceOffset, 2);
+}
+
+TEST(XtcProgress, EightByteFilesKeepTheirPageCountButCarryNoOffset) {
+  // Written by the firmware between the page-count field and the slice offset.
+  // A stored zero and "no stored value" are different, and only the flag
+  // distinguishes them -- without it every such volume would look like it had
+  // deliberately chosen an offset of zero.
+  const uint8_t eightByte[] = {0x39, 0x05, 0x00, 0x00, 0xD2, 0x04, 0x00, 0x00};
+  const Snapshot decoded = decode(eightByte, sizeof(eightByte));
+
+  EXPECT_TRUE(decoded.valid);
+  EXPECT_EQ(decoded.page, 1337u);
+  EXPECT_EQ(decoded.pageCount, 1234u);
+  EXPECT_FALSE(decoded.hasSliceOffset);
+  EXPECT_EQ(decoded.sliceOffset, 0);
 }
 
 TEST(XtcProgress, ReadsLegacyFourByteFilesAsPageOnly) {

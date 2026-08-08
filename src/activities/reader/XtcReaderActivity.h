@@ -35,6 +35,13 @@ class XtcReaderActivity final : public Activity {
   // Next-book suggestion menu for the End-of-Book screen
   EndOfBookOptions endOfBookOptions;
 
+  // Full-view lead-in correction in force for this volume. Remembered per book
+  // in progress.bin, because the correction is a property of the file's front
+  // matter: a shelf holds volumes needing different values, and one global
+  // number means re-entering it on every switch. SETTINGS.mangaSliceOffset is
+  // the manual override -- see loadProgress for how the two resolve.
+  int sliceOffset = 0;
+
   enum class StatusBarOverlayPosition { Bottom, Top };
   struct StatusBarInfo {
     int currentPage;
@@ -69,6 +76,11 @@ class XtcReaderActivity final : public Activity {
   // Opens chapter selection when the book has chapters (short-press Confirm); no-op otherwise
   void openChapterSelection();
   void renderStatusBarOverlay(StatusBarOverlayPosition position) const;
+  // Split view's bar: the title and a progress hairline against the panel edge,
+  // and nothing else. Its own function rather than more flags through
+  // GUI.drawStatusBar, which is shared with the EPUB and TXT readers and has no
+  // reason to grow a manga-only layout.
+  void renderSplitStatusBar(StatusBarOverlayPosition position) const;
   // The right-edge column. Its own function rather than a third case in
   // renderStatusBarOverlay: that one delegates to GUI.drawStatusBar, which is
   // horizontal by construction and shared with the EPUB and TXT readers.
