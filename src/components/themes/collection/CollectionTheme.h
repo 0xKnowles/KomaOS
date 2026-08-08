@@ -34,59 +34,58 @@ class GfxRenderer;
 
 namespace CollectionMetrics {
 
-// A koma dashboard, not a grid: one hero cover, two smaller panels beside it,
-// and a stats strip closing the block. Panel edges are slanted a few pixels so
-// the gutters read as inked panel borders rather than a table.
-//
-// The slant is in the BORDERS only. drawBitmap cannot rotate (GfxRenderer.cpp's
-// drawImage still carries the "rotate bits" TODO), so cover art stays upright
-// and the panel is masked back to its quad around it -- which is what sells the
-// effect anyway, since real koma hold upright art inside tilted frames.
+/**
+ * Panel interiors of src/images/KomaBackground.h, in logical coordinates.
+ *
+ * Measured off the converted image's pixels, not the artwork that produced it:
+ * the generator crops, thresholds and rotates, so the drawing's intent and the
+ * bytes on the device are not guaranteed to agree. Re-measure if the background
+ * is regenerated -- the static_asserts below catch a panel that has moved off
+ * the screen, but not one that has shifted by twenty pixels.
+ */
+struct Panel {
+  int x, y, w, h;
+  int right() const { return x + w; }
+  int bottom() const { return y + h; }
+};
 
-/** Inset of the whole block from the panel edge. */
-constexpr int MARGIN = 10;
-/** White gutter between komas. */
-constexpr int GUTTER = 8;
-/** Ink weight of a panel border. */
-constexpr int BORDER = 2;
-/** Largest per-corner displacement. Beyond ~6 the masking eats visible art. */
-constexpr int SLANT = 5;
+constexpr Panel BANNER{30, 42, 420, 55};
+constexpr Panel HERO{27, 105, 219, 229};
+constexpr Panel SIDE_TOP{246, 95, 205, 112};
+constexpr Panel SIDE_BOTTOM{252, 216, 201, 111};
+constexpr Panel STATS{30, 338, 422, 74};
 
-constexpr int HERO_WIDTH = 190;
-constexpr int HERO_HEIGHT = 260;
-/** Two stacked panels fill the height beside the hero. */
-constexpr int SIDE_HEIGHT = (HERO_HEIGHT - GUTTER) / 2;
-// 54, not 58: at 58 the worst-case menu's last row ends exactly on the button
-// hints. The static_assert below would still pass, but flush is not clearance.
-constexpr int STATS_HEIGHT = 54;
+constexpr int MENU_ROWS = 5;
+constexpr Panel MENU[MENU_ROWS] = {
+    {28, 413, 420, 58}, {28, 472, 424, 66}, {29, 539, 423, 58}, {28, 598, 424, 58}, {28, 658, 424, 59},
+};
 
-constexpr int COVER_HEIGHT = HERO_HEIGHT;
-/** Hero, plus the two volumes beside it. */
+/** Hero plus the two panels beside it. */
 constexpr int PANEL_COUNT = 3;
+/** Thumbnails are generated at the hero's height, the largest slot. */
+constexpr int COVER_HEIGHT = HERO.h;
+/** Inset of text from a panel's inked border. */
+constexpr int PAD = 8;
 
-constexpr int TILE_HEIGHT = HERO_HEIGHT + GUTTER + STATS_HEIGHT + SLANT * 2;
-
-// The home screen draws the button menu directly under this block, and the rect
-// it is given has a fixed height that does NOT subtract the cover tile -- so
-// nothing at runtime stops a tall block from pushing the last menu row into the
-// button hints. Check it here instead.
-//
-// Worst case is five rows: Browse / Recent / OPDS / Transfer / Settings.
-namespace layout_check {
-constexpr int MENU_ROWS_WORST_CASE = 5;
 constexpr int PORTRAIT_PANEL_HEIGHT = 800;
-constexpr int MENU_TOP = LyraMetrics::values.homeTopPadding + TILE_HEIGHT + LyraMetrics::values.homeMenuTopOffset;
-constexpr int MENU_HEIGHT = MENU_ROWS_WORST_CASE * LyraMetrics::values.menuRowHeight +
-                            (MENU_ROWS_WORST_CASE - 1) * LyraMetrics::values.menuSpacing;
-static_assert(MENU_TOP + MENU_HEIGHT <= PORTRAIT_PANEL_HEIGHT - LyraMetrics::values.buttonHintsHeight,
-              "Collection block is too tall: the home menu would overrun the button hints. "
-              "Reduce HERO_HEIGHT or STATS_HEIGHT.");
-}  // namespace layout_check
+static_assert(MENU[MENU_ROWS - 1].bottom() <= PORTRAIT_PANEL_HEIGHT - LyraMetrics::values.buttonHintsHeight,
+              "The background's last menu row overlaps the button hints.");
+static_assert(STATS.bottom() <= MENU[0].y, "The stats panel overlaps the first menu row.");
+static_assert(HERO.right() <= SIDE_TOP.x, "The hero panel overlaps the side column.");
 
 constexpr ThemeMetrics values = [] {
   ThemeMetrics v = LyraMetrics::values;
   v.homeCoverHeight = COVER_HEIGHT;
-  v.homeCoverTileHeight = TILE_HEIGHT;
+  // The theme paints the whole page, so it takes the whole page as its rect
+  // and HomeActivity is left with nothing to position.
+  v.homeTopPadding = 0;
+  v.homeCoverTileHeight = MENU[0].y;
+  v.homeMenuTopOffset = 0;
+  // Kept in step with the drawn rows so selection and touch land where the ink
+  // is. The rows are hand-drawn and not evenly pitched; drawButtonMenu places
+  // labels at their measured positions rather than deriving them from these.
+  v.menuRowHeight = MENU[0].h;
+  v.menuSpacing = MENU[1].y - MENU[0].bottom();
   v.homeRecentBooksCount = PANEL_COUNT;
   v.homeGroupRecentsBySeries = true;
   return v;
