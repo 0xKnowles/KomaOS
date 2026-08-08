@@ -161,9 +161,12 @@ void SleepActivity::renderDefaultSleepScreen() const {
   const auto pageHeight = renderer.getScreenHeight();
 
   renderer.clearScreen();
-  // The splash is a fixed 480x800 page of koma. Drawn first; everything below
-  // lands in the two panels the artwork deliberately leaves empty.
-  renderer.drawImage(BootSplash, 0, 0, SplashLayout::WIDTH, SplashLayout::HEIGHT);
+  // The splash is drawn first, in panel space (see SplashLayout.h -- the bitmap
+  // is stored pre-rotated because drawImage does not rotate bits). Everything
+  // below is in logical coordinates and lands in the panels the artwork leaves
+  // empty.
+  renderer.drawImage(BootSplash, SplashLayout::BLIT_X, SplashLayout::BLIT_Y, SplashLayout::BLIT_W,
+                     SplashLayout::BLIT_H);
   renderer.drawImage(Logo120, (pageWidth - SplashLayout::MARK_SIZE) / 2, SplashLayout::MARK_Y, SplashLayout::MARK_SIZE,
                      SplashLayout::MARK_SIZE);
   renderer.drawCenteredText(UI_10_FONT_ID, SplashLayout::WORDMARK_Y, tr(STR_KOMAOS), true, EpdFontFamily::BOLD);

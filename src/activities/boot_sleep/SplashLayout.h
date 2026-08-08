@@ -10,6 +10,32 @@
  */
 namespace SplashLayout {
 
+/**
+ * Blit geometry for the splash, which is NOT in logical coordinates.
+ *
+ * GfxRenderer::drawImage rotates the origin but hands the bitmap through
+ * untouched -- it still carries a "TODO: Rotate bits". So the image is stored
+ * pre-rotated in panel space (800x480, via gen_image_header.py --rotate 90) and
+ * the anchor has to be worked back through the Portrait transform:
+ *
+ *   phyX = y                        -> y = 0 puts it at the left edge
+ *   phyY = (panelHeight - 1 - x) - h -> x = -1, h = 480 puts it at the top
+ *
+ * Hence the -1: x = 0 would land the image one row above the panel. Passing
+ * y = 0 with the logical height of 800 -- the obvious call, and the one that
+ * shipped first -- computes phyY = -321, which HalDisplay::drawImage takes as
+ * uint16_t and turns into 65215. Nothing clips, nothing errors, and the splash
+ * simply never appears.
+ *
+ * Everything else here is in logical coordinates: drawCenteredText and drawIcon
+ * go through drawPixel, which does apply the orientation transform. Only the
+ * raw blit is in panel space.
+ */
+constexpr int BLIT_X = -1;
+constexpr int BLIT_Y = 0;
+constexpr int BLIT_W = 800;
+constexpr int BLIT_H = 480;
+
 constexpr int WIDTH = 480;
 constexpr int HEIGHT = 800;
 
