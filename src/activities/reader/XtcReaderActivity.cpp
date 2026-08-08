@@ -272,21 +272,6 @@ void XtcReaderActivity::loop() {
 
   // No null check on xtc: loop() returns at the top when it is null, and the
   // early return added for the menu made that provable to cppcheck.
-  // A short press of the front Back button opens Manga settings on top of the
-  // book rather than leaving it. Everything under that tab changes what is on
-  // screen right now -- view mode, slice offset, reading direction, status bar
-  // -- so wanting it mid-volume is the common case, and losing your place to
-  // reach it is not a trade worth making. It is pushed with
-  // startActivityForResult, so its own Back returns to the page you were on.
-  //
-  // Leaving the book is still a long press (file browser) or Go Home from the
-  // manga menu; this deliberately does not strand the reader.
-  if (mappedInput.wasReleased(MappedInputManager::Button::Back) &&
-      mappedInput.getHeldTime() < ReaderUtils::GO_BACK_OR_HOME_MS) {
-    startActivityForResult(std::make_unique<SettingsActivity>(renderer, mappedInput, SettingsActivity::MANGA_TAB),
-                           [this](const ActivityResult&) { requestUpdate(); });
-    return;
-  }
   if (ReaderUtils::handleBackNavigation(mappedInput, activityManager, xtc->getPath().c_str(),
                                         {this, [](void* ctx) { static_cast<XtcReaderActivity*>(ctx)->onGoHome(); }})) {
     return;
