@@ -27,6 +27,32 @@
 #include "components/UITheme.h"
 #include "fontIds.h"
 
+namespace {
+
+/**
+ * Build version as a reader wants to see it: "KomaOS v0.1.0".
+ *
+ * KOMAOS_VERSION carries a "-dev-<sha>" suffix on development builds
+ * (scripts/git_branch.py). That is build provenance, not something worth a
+ * settings header, so everything from the first hyphen is dropped for display.
+ * Only the display changes: OTA still compares the full KOMAOS_VERSION, which
+ * is what distinguishes two dev builds of the same base version.
+ *
+ * Static buffer rather than a std::string: this is called on every settings
+ * render, and the result is handed straight to drawHeader and used before the
+ * next call. Not rebuilt into a cache because tr() can change with the language.
+ */
+const char* displayVersion() {
+  static char buffer[40];
+  const char* const version = KOMAOS_VERSION;
+  const char* const suffix = strchr(version, '-');
+  const int baseLength = suffix != nullptr ? static_cast<int>(suffix - version) : static_cast<int>(strlen(version));
+  snprintf(buffer, sizeof(buffer), "%s v%.*s", tr(STR_KOMAOS), baseLength, version);
+  return buffer;
+}
+
+}  // namespace
+
 // Manga sits next to Reader: the two are the per-format halves of the same
 // idea, and grouping them keeps the tab order reading Display / Reader / Manga
 // rather than burying the manga options after Controls.
@@ -472,7 +498,7 @@ void SettingsActivity::render(RenderLock&&) {
   const auto& metrics = UITheme::getInstance().getMetrics();
 
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.headerHeight}, tr(STR_SETTINGS_TITLE),
-                 KOMAOS_VERSION);
+                 displayVersion());
 
   std::vector<TabInfo> tabs;
   tabs.reserve(categoryCount);
