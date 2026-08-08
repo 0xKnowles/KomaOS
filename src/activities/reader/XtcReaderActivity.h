@@ -49,6 +49,13 @@ class XtcReaderActivity final : public Activity {
   bool renderFullPage();
   /** Strips per turn: 3 in Full view, 1 in Split. */
   uint32_t pageStep() const;
+  /**
+   * Strips before the first grouped page, each of which stands alone.
+   *
+   * The file's own count corrected by SETTINGS.mangaSliceOffset, for volumes
+   * whose front matter is not what the encoder recorded.
+   */
+  uint32_t leadingStripCount() const;
   /** First strip of the page group `currentPage` falls in. */
   uint32_t pageGroupStart() const;
   bool fullViewActive() const;

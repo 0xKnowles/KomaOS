@@ -587,17 +587,29 @@ bool XtcReaderActivity::fullViewActive() const {
 
 uint32_t XtcReaderActivity::pageStep() const { return fullViewActive() ? FullPageLayout::STRIPS_PER_PAGE : 1; }
 
+uint32_t XtcReaderActivity::leadingStripCount() const {
+  // The cover is encoded nosplit, so it is one strip on its own and every group
+  // after it is offset by that. Grouping from zero instead splices the cover
+  // onto the next page's first two strips, and every page from there is a mix
+  // of two -- the symptom that sent this back for a second look.
+  //
+  // The file's own count is right for most volumes, but not all: front matter
+  // the encoder did not record as a lead-in -- an extra full-page plate after
+  // the cover -- leaves the grouping one strip out of step for the whole book.
+  // The setting shifts this so a reader can correct that volume without a
+  // re-export. Clamped at zero: a negative lead-in has no meaning, and the
+  // count is compared against unsigned page indices.
+  const int shifted = static_cast<int>(xtc->getSplitGeometry().leadingStrips) + SETTINGS.getMangaSliceOffset();
+  return static_cast<uint32_t>(std::max(0, shifted));
+}
+
 uint32_t XtcReaderActivity::pageGroupStart() const {
   const uint32_t step = pageStep();
   if (step <= 1) {
     return currentPage;
   }
 
-  // The cover is encoded nosplit, so it is one strip on its own and every group
-  // after it is offset by that. Grouping from zero instead splices the cover
-  // onto the next page's first two strips, and every page from there is a mix
-  // of two -- the symptom that sent this back for a second look.
-  const uint32_t leading = xtc->getSplitGeometry().leadingStrips;
+  const uint32_t leading = leadingStripCount();
   if (currentPage < leading) {
     return currentPage;  // Still in the lead-in; each of those stands alone.
   }
@@ -644,10 +656,9 @@ bool XtcReaderActivity::renderFullPage() {
 
   const uint32_t firstStrip = pageGroupStart();
   // A lead-in strip is a whole page by itself; reassembling from it would pull
-  // in the next page's strips. Widened first: comparing a uint32_t against the
-  // uint8_t field directly promotes it to int and trips -Wsign-compare.
-  const uint32_t leadingStrips = xtc->getSplitGeometry().leadingStrips;
-  if (firstStrip < leadingStrips) {
+  // in the next page's strips. Returning false here falls back to the ordinary
+  // single-strip render, which is what a lead-in page wants anyway.
+  if (firstStrip < leadingStripCount()) {
     return false;
   }
   for (int i = 0; i < FullPageLayout::STRIPS_PER_PAGE; i++) {

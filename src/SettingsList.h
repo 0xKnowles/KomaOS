@@ -256,6 +256,13 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                           {StrId::STR_PERCENT_20, StrId::STR_PERCENT_24, StrId::STR_PERCENT_27, StrId::STR_PERCENT_31,
                            StrId::STR_PERCENT_35},
                           "mangaFullOverlap", StrId::STR_CAT_MANGA),
+        // Also Full-view only. Corrects a volume whose front matter is not what
+        // the encoder recorded, which otherwise groups every page out of step.
+        SettingInfo::Enum(
+            StrId::STR_MANGA_SLICE_OFFSET, &KomaSettings::mangaSliceOffset,
+            {StrId::STR_SLICE_MINUS_3, StrId::STR_SLICE_MINUS_2, StrId::STR_SLICE_MINUS_1, StrId::STR_SLICE_OFFSET_AUTO,
+             StrId::STR_SLICE_PLUS_1, StrId::STR_SLICE_PLUS_2, StrId::STR_SLICE_PLUS_3},
+            "mangaSliceOffset", StrId::STR_CAT_MANGA),
 
         // --- Reader ---
         // Built-in font-family entry. Replaced per-call with a registry-aware

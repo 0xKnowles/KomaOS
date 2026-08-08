@@ -83,6 +83,24 @@ class KomaSettings : public PersistableStore<KomaSettings> {
     MANGA_OVERLAP_COUNT
   };
   static constexpr uint8_t mangaFullOverlapPercentValues[MANGA_OVERLAP_COUNT] = {20, 24, 27, 31, 35};
+  // Shift applied to the file's own lead-in strip count when Full view groups
+  // strips into pages. A volume whose front matter is not what the encoder
+  // recorded -- an extra full-page plate after the cover, say -- groups one
+  // strip out of step, and every page after it is a mix of two. AUTO trusts the
+  // file, which is right for most volumes; the rest let a reader correct one
+  // that is not. The range covers a full grouping cycle either way, plus room
+  // for a couple of extra standalone plates.
+  enum MANGA_SLICE_OFFSET {
+    MANGA_SLICE_MINUS_3 = 0,
+    MANGA_SLICE_MINUS_2 = 1,
+    MANGA_SLICE_MINUS_1 = 2,
+    MANGA_SLICE_AUTO = 3,
+    MANGA_SLICE_PLUS_1 = 4,
+    MANGA_SLICE_PLUS_2 = 5,
+    MANGA_SLICE_PLUS_3 = 6,
+    MANGA_SLICE_OFFSET_COUNT
+  };
+  static constexpr int8_t mangaSliceOffsetValues[MANGA_SLICE_OFFSET_COUNT] = {-3, -2, -1, 0, 1, 2, 3};
 
   enum XTC_STATUS_BAR_MODE {
     XTC_STATUS_BAR_HIDE = 0,
@@ -263,6 +281,9 @@ class KomaSettings : public PersistableStore<KomaSettings> {
   // ratio and does not record it; see FullPageLayout.h. Index into
   // mangaFullOverlapPercentValues, not the percentage itself.
   uint8_t mangaFullOverlap = MANGA_OVERLAP_27;
+  // Correction applied to the file's lead-in strip count in FULL view. Index
+  // into mangaSliceOffsetValues, not the shift itself.
+  uint8_t mangaSliceOffset = MANGA_SLICE_AUTO;
   // Clock display in status bar (X3 only, requires DS3231 RTC)
   uint8_t statusBarClock = STATUS_BAR_CLOCK_HIDE;
   // Clock UTC offset in quarter-hour steps, biased by 48 so it fits in uint8_t.
@@ -433,6 +454,8 @@ class KomaSettings : public PersistableStore<KomaSettings> {
   int getMangaSkipPages() const;
   /** Strip overlap as a percentage, resolved from the mangaFullOverlap index. */
   int getMangaFullOverlapPercent() const;
+  /** Lead-in shift for Full view, resolved from the mangaSliceOffset index. */
+  int getMangaSliceOffset() const;
 };
 
 // Helper macro to access settings

@@ -334,6 +334,14 @@ int KomaSettings::getMangaFullOverlapPercent() const {
   return mangaFullOverlapPercentValues[mangaFullOverlap];
 }
 
+int KomaSettings::getMangaSliceOffset() const {
+  // Bounds-checked for the same reason as the overlap above.
+  if (mangaSliceOffset >= MANGA_SLICE_OFFSET_COUNT) {
+    return mangaSliceOffsetValues[MANGA_SLICE_AUTO];
+  }
+  return mangaSliceOffsetValues[mangaSliceOffset];
+}
+
 int KomaSettings::getMangaSkipPages() const {
   switch (mangaSkipPages) {
     case MANGA_SKIP_3:
