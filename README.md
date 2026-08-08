@@ -11,8 +11,8 @@
 [![Platform](https://img.shields.io/badge/platform-ESP32--C3-red?style=for-the-badge&logo=espressif)](https://www.espressif.com/en/products/socs/esp32-c3)
 [![Hardware](https://img.shields.io/badge/hardware-Xteink%20X3%20%7C%20X4-lightgrey?style=for-the-badge)](https://www.xteink.com/)
 
-<img src="./brand/Home.png" alt="KomaOS Home on an Xteink X4" width="300">
-<img src="./brand/Settings.png" alt="KomaOS settings on an Xteink X4" width="300">
+<img src="./docs/images/screens/Home.png" alt="KomaOS home screen" width="300">
+
 </div>
 
 ---
@@ -27,28 +27,49 @@ The ESP32-C3 cannot decode a full-resolution JPEG per page turn inside a 380 KB 
 does not try. Pages are pre-rendered off-device into **XTC/XTCH** — 1-bit or 2-bit grayscale at panel
 resolution — and a page turn costs a decode-free blit.
 
-<div align="center">
-<img src="./brand/Full_1.png" alt="KomaOS settings on an Xteink X4" width="300">
-<img src="./brand/Full_2.png" alt="KomaOS settings on an Xteink X4" width="300">
-<img src="./brand/Full_3.png" alt="KomaOS settings on an Xteink X4" width="300">
-</div>
+## Two ways to read a page
+
+A manga page is taller than the panel. KomaOS gives you both answers to that, switchable from the
+manga menu without leaving your place.
+
+### Split — the reading view
+
+A tall page is cut into three overlapping strips off-device, so no panel is ever cut in half across a
+page turn. Each strip fills the screen 1:1 in landscape. This is the encoder's own output: no
+resampling, no re-dithering, full detail.
 
 <div align="center">
-<img src="./brand/Slice_1.png" alt="KomaOS settings on an Xteink X4" width="600">
+<img src="./docs/images/screens/Slice_1.png" alt="Split view, strip 1" width="420">
+<img src="./docs/images/screens/Slice_2.png" alt="Split view, strip 2" width="420">
 </div>
+
+### Full page — the orientation view
+
+The same three strips reassembled on the device, with the overlap cropped so nothing is drawn twice.
+Necessarily softer — it re-dithers art that was already dithered — so it works best for finding your
+place on a spread rather than for reading.
+
 <div align="center">
-<img src="./brand/Slice_2.png" alt="KomaOS settings on an Xteink X4" width="600">
+<img src="./docs/images/screens/Full_1.png" alt="Full page view" width="240">
+<img src="./docs/images/screens/Full_2.png" alt="Full page view" width="240">
+<img src="./docs/images/screens/Full_3.png" alt="Full page view" width="240">
 </div>
+
 ## Highlights
 
 | | |
 |---|---|
 | **Manga reader** | Split and full-page view modes, reading-direction control (LTR/RTL, or from the file), quick page jump, per-volume bookmarks, chapter selection |
-| **Manga menu** | One press from the page: jump, bookmark, view mode, orientation, screenshot, reader settings |
+| **Manga menu** | One press from the page: jump, bookmark, view mode, orientation, screenshot, manga settings |
+| **Per-volume memory** | Reading position, bookmarks and slice offset are remembered per book, not globally |
 | **Status bar** | Bottom, top, or a vertical column down the right edge for landscape reading — with glyphs turned to match pre-rotated artwork |
-| **KomaUI theme** | A home screen laid out as manga panels: hero cover, recent volumes, reading stats |
+| **KomaUI theme** | A home screen laid out as manga panels: three covers, reading stats, inked menu rows |
 | **Full reader engine** | EPUB 2/3, `.txt`, `.bmp`, hyphenation, kerning, footnotes, dictionary lookups ([StarDict](docs/dictionary.md)), focus reading, KOReader sync |
 | **Wireless** | Wi-Fi transfer, OPDS browsing, Calibre wireless, OTA updates |
+
+<div align="center">
+<img src="./docs/images/screens/Settings.png" alt="KomaOS settings" width="300">
+</div>
 
 ## Getting manga onto the device
 
@@ -59,10 +80,9 @@ CBZ and CBR are converted to XTC on a real computer, not on the device.
   sharpen, serpentine Floyd–Steinberg dithering and the overlapping-strip layout are all tunable.
 - **[xtcjs](https://github.com/varo6/xtcjs)** — a browser tool for one-off conversions.
 
-A tall manga page is split into overlapping strips so no panel is cut in half across a page turn.
-**Full page** view reassembles those strips on the device, cropping the overlap so nothing is drawn
-twice. It is necessarily softer than reading the strips — it re-dithers art that was already
-dithered — so it works best as an orientation view rather than a reading view.
+FlipNzb records the split geometry into the file, so the reader never has to guess the overlap or the
+rotation when reassembling a full page. Volumes converted by a tool that does not record it fall back
+to a **Slice Offset** setting under Manga, remembered per book.
 
 ## Hardware
 
@@ -74,7 +94,8 @@ dithered — so it works best as an orientation view rather than a reading view.
 | **Display** | 800×480 e-ink (X4) / 792×528 (X3), 48 KB single framebuffer |
 | **Storage** | SD card, with an aggressive on-card cache under `/.komaos/` |
 
-One firmware binary covers both devices; the hardware is detected at runtime.
+One firmware binary covers both devices; the hardware is detected at runtime. The KomaUI theme's
+artwork is currently measured for the X4 panel — on an X3, use one of the inherited themes.
 
 ## Install
 

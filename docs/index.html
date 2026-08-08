@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KomaOS — manga-first e-reader firmware</title>
+<meta name="description" content="Manga-first e-reader firmware for ESP32-C3 Xteink devices. Split and full-page reading, pre-rendered XTC pages, decode-free page turns.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+<style>
+:root{
+  --ink:#111; --paper:#fff; --muted:#5b5b5b; --line:#111;
+  --rule:#e3e3e3; --panel:#fafafa; --accent:#111; --shadow:0 2px 0 #111;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ink:#ececec; --paper:#0e0e0e; --muted:#a0a0a0; --line:#ececec;
+    --rule:#2a2a2a; --panel:#161616; --accent:#ececec; --shadow:0 2px 0 #ececec;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#ececec; --paper:#0e0e0e; --muted:#a0a0a0; --line:#ececec;
+  --rule:#2a2a2a; --panel:#161616; --accent:#ececec; --shadow:0 2px 0 #ececec;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font:16px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+a{color:var(--ink)}
+img{max-width:100%;height:auto;display:block}
+
+/* ---- top bar ---- */
+.bar{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:2px solid var(--line)}
+.bar .wrap{display:flex;align-items:center;gap:16px;height:56px}
+.brand{font-weight:800;letter-spacing:.04em;text-decoration:none;font-size:18px}
+.bar nav{margin-left:auto;display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.bar nav a{color:var(--muted);text-decoration:none;font-size:14px;font-weight:600}
+.bar nav a:hover{color:var(--ink)}
+.tbtn{border:2px solid var(--line);background:transparent;color:var(--ink);border-radius:6px;
+  padding:4px 9px;font-size:13px;font-weight:700;cursor:pointer;line-height:1.4}
+
+/* ---- hero ---- */
+.hero{padding:64px 0 40px;text-align:center;border-bottom:2px solid var(--line)}
+.hero h1{font-size:clamp(38px,8vw,68px);margin:0 0 10px;letter-spacing:-.02em;line-height:1.02}
+.kicker{color:var(--muted);font-size:clamp(16px,2.4vw,20px);margin:0 auto 8px;max-width:620px}
+.jp{color:var(--muted);font-size:14px;margin-bottom:26px}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:34px}
+.btn{display:inline-block;text-decoration:none;font-weight:700;font-size:15px;padding:11px 20px;
+  border:2px solid var(--line);border-radius:8px;box-shadow:var(--shadow);transition:transform .08s}
+.btn:active{transform:translateY(2px);box-shadow:none}
+.btn.solid{background:var(--ink);color:var(--paper)}
+.hero-shot{max-width:290px;margin:0 auto;border:3px solid var(--line);border-radius:6px;overflow:hidden}
+
+/* ---- sections ---- */
+section{padding:56px 0;border-bottom:2px solid var(--line)}
+h2{font-size:clamp(26px,4vw,36px);margin:0 0 8px;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:0 0 28px;max-width:660px}
+h3{font-size:19px;margin:0 0 6px}
+
+/* ---- view-mode switcher ---- */
+.switch{display:inline-flex;border:2px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:22px}
+.switch button{appearance:none;border:0;background:transparent;color:var(--ink);
+  font:inherit;font-weight:700;padding:10px 22px;cursor:pointer}
+.switch button[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+.pane[hidden]{display:none}
+.shots{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.shot{border:3px solid var(--line);border-radius:6px;overflow:hidden;background:#fff;cursor:zoom-in}
+.shot.land{flex:1 1 420px;max-width:460px}
+.shot.port{flex:0 1 220px;max-width:230px}
+.note{color:var(--muted);font-size:14px;margin-top:18px;max-width:660px}
+
+/* ---- cards ---- */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px}
+.card{border:2px solid var(--line);border-radius:10px;padding:18px 20px;background:var(--panel);
+  box-shadow:var(--shadow)}
+.card p{margin:0;color:var(--muted);font-size:15px}
+
+/* ---- spec table ---- */
+table{width:100%;border-collapse:collapse;font-size:15px}
+td{padding:11px 8px;border-bottom:1px solid var(--rule);vertical-align:top}
+td:first-child{font-weight:700;width:34%;white-space:nowrap}
+.scroll{overflow-x:auto}
+
+/* ---- code ---- */
+pre{background:var(--panel);border:2px solid var(--line);border-radius:8px;padding:14px 16px;
+  overflow-x:auto;font-size:14px;line-height:1.55}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+ol.steps{padding-left:20px} ol.steps li{margin-bottom:10px}
+
+/* ---- lightbox ---- */
+dialog#lb{border:0;padding:0;background:transparent;max-width:96vw;max-height:96vh}
+dialog#lb::backdrop{background:rgba(0,0,0,.82)}
+dialog#lb img{max-height:92vh;width:auto;border:3px solid #fff;border-radius:6px}
+dialog#lb button{position:fixed;top:14px;right:16px;font-size:26px;line-height:1;background:#fff;
+  color:#111;border:0;border-radius:6px;padding:4px 12px;cursor:pointer;font-weight:700}
+
+footer{padding:34px 0 60px;color:var(--muted);font-size:14px;text-align:center}
+footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap">
+    <a class="brand" href="#top">KomaOS</a>
+    <nav>
+      <a href="#views">Reading</a>
+      <a href="#features">Features</a>
+      <a href="#pipeline">Pipeline</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/0xKnowles/KomaOS">GitHub</a>
+      <button class="tbtn" id="theme" type="button" aria-label="Toggle colour theme">◐</button>
+    </nav>
+  </div>
+</header>
+
+<div id="top" class="hero">
+  <div class="wrap">
+    <h1>Manga, on e-ink,<br>without the wait.</h1>
+    <p class="kicker">Manga-first e-reader firmware for ESP32-C3 Xteink devices. Pages are
+      pre-rendered off-device, so a page turn costs a decode-free blit.</p>
+    <p class="jp"><em>Koma</em> (コマ) — the Japanese word for a manga panel.</p>
+    <div class="cta">
+      <a class="btn solid" href="#install">Install</a>
+      <a class="btn" href="https://github.com/0xKnowles/KomaOS">Source</a>
+      <a class="btn" href="https://github.com/0xKnowles/KomaOS/releases">Releases</a>
+    </div>
+    <div class="hero-shot"><img src="images/screens/Home.png" alt="KomaOS home screen showing three manga covers, reading stats and menu rows" width="480" height="800"></div>
+  </div>
+</div>
+
+<section id="views">
+  <div class="wrap">
+    <h2>Two ways to read a page</h2>
+    <p class="sub">A manga page is taller than the panel. KomaOS gives you both answers,
+      switchable from the manga menu without leaving your place.</p>
+
+    <div class="switch" role="tablist" aria-label="Reading view mode">
+      <button role="tab" id="tab-split" aria-controls="pane-split" aria-selected="true">Split</button>
+      <button role="tab" id="tab-full"  aria-controls="pane-full"  aria-selected="false">Full page</button>
+    </div>
+
+    <div class="pane" id="pane-split" role="tabpanel" aria-labelledby="tab-split">
+      <h3>Split — the reading view</h3>
+      <p class="sub">A tall page is cut into three overlapping strips off-device, so no panel is
+        ever cut in half across a page turn. Each strip fills the screen 1:1 in landscape — no
+        resampling, no re-dithering, full detail.</p>
+      <div class="shots">
+        <div class="shot land"><img src="images/screens/Slice_1.png" alt="Split view, first strip" loading="lazy" width="800" height="480"></div>
+        <div class="shot land"><img src="images/screens/Slice_2.png" alt="Split view, second strip" loading="lazy" width="800" height="480"></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-full" role="tabpanel" aria-labelledby="tab-full" hidden>
+      <h3>Full page — the orientation view</h3>
+      <p class="sub">The same three strips reassembled on the device, overlap cropped so nothing is
+        drawn twice. Necessarily softer — it re-dithers art that was already dithered — so it works
+        best for finding your place on a spread rather than for reading.</p>
+      <div class="shots">
+        <div class="shot port"><img src="images/screens/Full_1.png" alt="Full page view" loading="lazy" width="480" height="800"></div>
+        <div class="shot port"><img src="images/screens/Full_2.png" alt="Full page view" loading="lazy" width="480" height="800"></div>
+        <div class="shot port"><img src="images/screens/Full_3.png" alt="Full page view" loading="lazy" width="480" height="800"></div>
+      </div>
+    </div>
+
+    <p class="note">Tap any screenshot to view it full size. All shots are straight off the device
+      at panel resolution.</p>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2>What it does</h2>
+    <p class="sub">Everything CrossPoint Reader does, plus the manga layer it was missing.</p>
+    <div class="grid">
+      <div class="card"><h3>Manga reader</h3><p>Split and full-page modes, LTR/RTL or direction from
+        the file, quick page jump, per-volume bookmarks, chapter selection.</p></div>
+      <div class="card"><h3>Manga menu</h3><p>One press from the page: jump, bookmark, view mode,
+        orientation, screenshot, manga settings.</p></div>
+      <div class="card"><h3>Per-volume memory</h3><p>Reading position, bookmarks and slice offset are
+        remembered per book, not globally.</p></div>
+      <div class="card"><h3>Status bar</h3><p>Bottom, top, or a column down the right edge for
+        landscape reading — glyphs turned to match pre-rotated artwork.</p></div>
+      <div class="card"><h3>KomaUI theme</h3><p>A home screen laid out as manga panels: three covers,
+        reading stats, inked menu rows.</p></div>
+      <div class="card"><h3>Full reader engine</h3><p>EPUB 2/3, .txt, .bmp, hyphenation, footnotes,
+        StarDict lookups, focus reading, KOReader sync.</p></div>
+      <div class="card"><h3>Wireless</h3><p>Wi-Fi transfer, OPDS browsing, Calibre wireless and OTA
+        updates.</p></div>
+      <div class="card"><h3>Open source</h3><p>MIT licensed, full upstream history preserved, fixes
+        merged from CrossPoint Reader regularly.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="pipeline">
+  <div class="wrap">
+    <h2>How pages get there</h2>
+    <p class="sub">The ESP32-C3 cannot decode a full-resolution JPEG per page turn inside a 380 KB RAM
+      budget. So KomaOS does not try — the expensive work happens on a real computer.</p>
+    <div class="scroll">
+      <table>
+        <tr><td>Convert</td><td><a href="https://github.com/0xKnowles/FlipNzb">FlipNzb</a> watches
+          your indexers and converts volumes to XTC in place, or
+          <a href="https://github.com/varo6/xtcjs">xtcjs</a> for one-off files in the browser.</td></tr>
+        <tr><td>Store</td><td><strong>XTC / XTCH</strong> — 1-bit or 2-bit grayscale, already at panel
+          resolution, already dithered.</td></tr>
+        <tr><td>Read</td><td>A page turn is a blit. No decode, no reflow, no allocation spike.</td></tr>
+        <tr><td>Geometry</td><td>The converter records the split geometry into the file, so the reader
+          never guesses the overlap or rotation when reassembling a full page.</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="specs">
+  <div class="wrap">
+    <h2>Hardware</h2>
+    <p class="sub">One firmware binary covers both devices; the hardware is detected at runtime.</p>
+    <div class="scroll">
+      <table>
+        <tr><td>MCU</td><td>ESP32-C3, single-core RISC-V @ 160 MHz</td></tr>
+        <tr><td>RAM</td><td>~380 KB usable, no PSRAM</td></tr>
+        <tr><td>Flash</td><td>16 MB</td></tr>
+        <tr><td>Display</td><td>800×480 e-ink (X4) / 792×528 (X3), 48 KB single framebuffer</td></tr>
+        <tr><td>Storage</td><td>SD card, with an on-card cache under <code>/.komaos/</code></td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <h2>Install</h2>
+    <p class="sub">Coming from CrossPoint Reader? Rename <code>/.crosspoint/</code> to
+      <code>/.komaos/</code> on the card before first boot and your settings, progress, bookmarks and
+      caches carry over. Skip it and nothing breaks — you just start fresh.</p>
+
+    <h3>Web installer</h3>
+    <ol class="steps">
+      <li>Connect the device over USB-C, then wake and unlock it.</li>
+      <li>Open <a href="https://crosspointreader.com/#flash-tools">crosspointreader.com/#flash-tools</a>,
+          pick your device, and choose a KomaOS release.</li>
+      <li>For a specific build, download a <code>firmware.bin</code> from
+          <a href="https://github.com/0xKnowles/KomaOS/releases">Releases</a> and choose
+          <strong>Custom .bin</strong>.</li>
+    </ol>
+
+    <h3>Command line</h3>
+<pre><code>pip install esptool
+esptool --chip esp32c3 --port /dev/ttyACM0 write-flash 0x0 firmware.bin</code></pre>
+
+    <h3>Build from source</h3>
+<pre><code>git clone --recursive https://github.com/0xKnowles/KomaOS.git
+cd KomaOS
+pio run              # build
+pio run -t upload    # build and flash
+pio device monitor   # serial log</code></pre>
+    <p class="note">Requires <a href="https://platformio.org/">PlatformIO</a>. Reverting to stock
+      firmware uses the same flash tool.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>MIT licensed. A friendly fork of
+      <a href="https://github.com/crosspoint-reader/crosspoint-reader">CrossPoint Reader</a> by
+      Dave Allie and contributors.</p>
+    <p><a href="https://github.com/0xKnowles/KomaOS">github.com/0xKnowles/KomaOS</a></p>
+  </div>
+</footer>
+
+<dialog id="lb"><button type="button" aria-label="Close">×</button><img alt=""></dialog>
+
+<script>
+// Theme toggle. Stored so the choice survives navigation; falls back to the OS setting.
+(function(){
+  var root=document.documentElement, saved=null;
+  try{ saved=localStorage.getItem('koma-theme'); }catch(e){}
+  if(saved) root.setAttribute('data-theme',saved);
+  document.getElementById('theme').addEventListener('click',function(){
+    var now=root.getAttribute('data-theme');
+    if(!now) now=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
+    var next=now==='dark'?'light':'dark';
+    root.setAttribute('data-theme',next);
+    try{ localStorage.setItem('koma-theme',next); }catch(e){}
+  });
+})();
+
+// Split / Full page tabs.
+(function(){
+  var tabs=[['tab-split','pane-split'],['tab-full','pane-full']];
+  tabs.forEach(function(pair){
+    document.getElementById(pair[0]).addEventListener('click',function(){
+      tabs.forEach(function(p){
+        var on=p[0]===pair[0];
+        document.getElementById(p[0]).setAttribute('aria-selected',String(on));
+        document.getElementById(p[1]).hidden=!on;
+      });
+    });
+  });
+})();
+
+// Screenshot lightbox.
+(function(){
+  var lb=document.getElementById('lb'), img=lb.querySelector('img');
+  if(!lb.showModal) return;               // no <dialog> support: images still open via their own size
+  document.querySelectorAll('.shot img, .hero-shot img').forEach(function(el){
+    el.parentElement.addEventListener('click',function(){
+      img.src=el.currentSrc||el.src; img.alt=el.alt; lb.showModal();
+    });
+  });
+  function close(){ lb.close(); img.removeAttribute('src'); }
+  lb.querySelector('button').addEventListener('click',close);
+  lb.addEventListener('click',function(e){ if(e.target===lb) close(); });
+})();
+</script>
+</body>
+</html>
