@@ -1,320 +1,130 @@
-# KomaOS
+<div align="center">
 
-<img src="./docs/images/komaos-lockup.png" alt="KomaOS" width="320">
+<img src="./docs/images/komaos-lockup.png" alt="KomaOS" width="360">
 
-**Manga-first e-reader firmware for ESP32-C3 Xteink devices.**
+### Manga-first e-reader firmware for ESP32-C3 Xteink devices
 
-*Koma* (コマ) is the Japanese word for a manga panel. KomaOS keeps everything that makes
-[CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader) a good EPUB reader and
-builds the missing half on top of it: fast paged image reading, volume-aware libraries, and a
-comic pipeline that starts at a CBZ on your NAS and ends at a page on the panel.
+*Koma* (コマ) is the Japanese word for a manga panel.
 
-**Now running on:** ESP32C3-based Xteink [X4](https://www.xteink.com/products/xteink-x4) and [X3](https://www.xteink.com/products/xteink-x3).
+[![Build](https://img.shields.io/github/actions/workflow/status/0xKnowles/KomaOS/ci.yml?style=for-the-badge&logo=github&label=build)](https://github.com/0xKnowles/KomaOS/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-ESP32--C3-red?style=for-the-badge&logo=espressif)](https://www.espressif.com/en/products/socs/esp32-c3)
+[![Hardware](https://img.shields.io/badge/hardware-Xteink%20X3%20%7C%20X4-lightgrey?style=for-the-badge)](https://www.xteink.com/)
 
-## Relationship to CrossPoint Reader
+<img src="./docs/images/cover.jpg" alt="KomaOS running on an Xteink X4" width="620">
 
-KomaOS is a friendly fork of [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader)
-by Dave Allie and contributors, MIT licensed, with full history preserved. Upstream fixes are merged
-in regularly. Everything upstream does — EPUB rendering, Wi-Fi transfer, OPDS, KOReader sync — still
-works here; KomaOS adds the manga layer rather than replacing the reader.
+</div>
 
-Bugs in shared code are best reported upstream. Bugs in anything manga-specific belong here.
+---
+
+## What it is
+
+KomaOS keeps everything that makes [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader)
+a good EPUB reader and builds the missing half on top of it: fast paged-image reading, volume-aware
+libraries, and a comic pipeline that starts at a CBZ on your NAS and ends at a page on the panel.
+
+The ESP32-C3 cannot decode a full-resolution JPEG per page turn inside a 380 KB RAM budget. So KomaOS
+does not try. Pages are pre-rendered off-device into **XTC/XTCH** — 1-bit or 2-bit grayscale at panel
+resolution — and a page turn costs a decode-free blit.
+
+## Highlights
+
+| | |
+|---|---|
+| **Manga reader** | Split and full-page view modes, reading-direction control (LTR/RTL, or from the file), quick page jump, per-volume bookmarks, chapter selection |
+| **Manga menu** | One press from the page: jump, bookmark, view mode, orientation, screenshot, reader settings |
+| **Status bar** | Bottom, top, or a vertical column down the right edge for landscape reading — with glyphs turned to match pre-rotated artwork |
+| **KomaUI theme** | A home screen laid out as manga panels: hero cover, recent volumes, reading stats |
+| **Full reader engine** | EPUB 2/3, `.txt`, `.bmp`, hyphenation, kerning, footnotes, dictionary lookups ([StarDict](docs/dictionary.md)), focus reading, KOReader sync |
+| **Wireless** | Wi-Fi transfer, OPDS browsing, Calibre wireless, OTA updates |
 
 ## Getting manga onto the device
 
-The device reads **XTC/XTCH** — pre-rendered 1-bit (or 2-bit grayscale) pages at panel resolution, so
-page turns cost a decode-free blit instead of a JPEG decode the ESP32-C3 cannot afford.
-
-CBZ and CBR are converted to XTC on a real computer, not on the device. Two ways to do that:
+CBZ and CBR are converted to XTC on a real computer, not on the device.
 
 - **[FlipNzb](https://github.com/0xKnowles/FlipNzb)** — monitors mangaka, grabs volumes from your
   indexers, and converts the result to XTC in place (Media Management → Conversion). Contrast stretch,
   sharpen, serpentine Floyd–Steinberg dithering and the overlapping-strip layout are all tunable.
 - **[xtcjs](https://github.com/varo6/xtcjs)** — a browser tool for one-off conversions.
 
-## What can KomaOS do?
+A tall manga page is split into overlapping strips so no panel is cut in half across a page turn.
+**Full page** view reassembles those strips on the device, cropping the overlap so nothing is drawn
+twice. It is necessarily softer than reading the strips — it re-dithers art that was already
+dithered — so it works best as an orientation view rather than a reading view.
 
-- **Reader engine**: EPUB 2/3 rendering with embedded-style option, image handling, hyphenation, kerning, chapter navigation, footnotes, bookmarks, dictionary lookups ([StarDict](docs/dictionary.md)), go-to-percent, auto page turn, orientation control, focus reading, KOReader progress sync and more. 
+## Hardware
 
-- **Various formats**: native handling for `.epub`, `.xtc/.xtch`, `.txt`, and `.bmp`.
+| | |
+|---|---|
+| **MCU** | ESP32-C3, single-core RISC-V @ 160 MHz |
+| **RAM** | ~380 KB usable, no PSRAM |
+| **Flash** | 16 MB |
+| **Display** | 800×480 e-ink (X4) / 792×528 (X3), 48 KB single framebuffer |
+| **Storage** | SD card, with an aggressive on-card cache under `/.komaos/` |
 
-- **Manga page direction**: right-to-left page turns for XTC/XTCH books, following the file's own reading-direction flag or forced either way (Settings → Reader → Manga Page Direction).
+One firmware binary covers both devices; the hardware is detected at runtime.
 
-- **Screenshots.**
-
-- **Custom fonts**: install your favorite fonts on the SD card.
-
-- **Tilt page turn (X3 only)**.
-
-- **Library workflow**: folder browser, hidden-file toggle, long-press delete, recent books, SD-cache management.
-
-- **Wireless workflows**:
-  
-  - File transfer web UI
-  - EPUB Optimizer
-  - Web settings UI/API (edit many device settings from browser)
-  - WebSocket fast uploads
-  - WebDAV handler
-  - AP mode (hotspot) and STA mode (join existing Wi-Fi), both with QR helpers
-  - Calibre wireless connect flow
-  - OPDS browser with saved servers (up to 8), search, pagination, and direct download
-  - OTA update checks and installs from GitHub releases
-
-- **Customization**: multiple themes (Classic, Lyra, Lyra Extended, RoundedRaff), sleep screen modes, front/side button remapping, status bar controls, power-button behavior, refresh cadence, and more.
-
-- **Localization**: 24 UI languages and counting. RTL support.
-
-### Coming soon (manga roadmap):
-
-See [ROADMAP.md](./ROADMAP.md) for the full list. The near-term work:
-
-- **Series shelf** — group volumes by series, resume at the right volume, roll over at the end of one.
-- **Panel/strip navigation** — treat the overlapping strips a volume was sliced into as first-class
-  navigation instead of anonymous pages.
-- **On-device CBZ** — read a stored (uncompressed) CBZ directly when no converted XTC exists.
-- **Two-page spread detection** — recognise a double-width page and lay it out as a spread.
-
----
-
-## USB-locked devices (Xteink Unlocker)
-
-Some Xteink units purchased from third-party stores (e.g. AliExpress) ship with USB flashing locked from the factory.
-If your device is locked, you will need to use the **Xteink Unlocker** tool available at
-https://crosspointreader.com/#unlock-tool before you can flash KomaOS.
-
-**You do not need this tool if you bought your device directly from xteink.com.** Those units are not locked.
-
-**Not sure if your device is locked?** Power it on, connect the USB-C cable, and try flashing via the web flasher first (see
-[Install firmware](#install-firmware) below). If the browser's serial device picker does not show your device, try a different
-USB port or browser before assuming the device is locked. Only reach for the unlocker if the device still doesn't appear.
-
-> ### ⚠️ WARNING: READ THIS BEFORE USING THE UNLOCKER ⚠️
-> 
-> **The only officially supported firmwares in the unlock tool are KomaOS and CrossInk.**
-> 
-> Flashing any other firmware on a USB-locked device may **permanently brick the device** or leave it **permanently
-> stuck on that firmware with no recovery path**. Once USB flashing is re-locked, your only way back is via OTA, and if
-> the firmware you flashed doesn't support OTA, **there is no way out**.
-
-## Install firmware
+## Install
 
 > **Coming from CrossPoint Reader?** KomaOS keeps its SD cache and settings under `/.komaos/`
 > instead of `/.crosspoint/`. Rename that folder on the card before first boot and your settings,
 > reading progress, bookmarks and parsed-book caches carry over intact. Skip the rename and nothing
-> breaks — you just start fresh and re-parse your library, with the old folder left on the card.
+> breaks — you just start fresh and re-parse your library.
 
 ### Web installer (recommended)
 
-1. Connect your device to your computer via USB-C and wake/unlock the device
-2. Go to https://crosspointreader.com/#flash-tools, select device (X3 or X4), and choose an official KomaOS release.
+1. Connect the device over USB-C, then wake and unlock it.
+2. Go to [crosspointreader.com/#flash-tools](https://crosspointreader.com/#flash-tools), select your
+   device (X3 or X4), and choose an official KomaOS release.
 
-### Web installer (specific version)
-
-1. Connect your device to your computer via USB-C and wake/unlock the device
-2. Download a `firmware.bin` from [Releases](https://github.com/0xKnowles/KomaOS/releases), local build, or continuous integration artifact.
-3. Go to https://crosspointreader.com/#flash-tools, select device (X3 or X4), click "Custom .bin" and upload a `firmware.bin`.
-
-### Revert to Official Firmware
-
-To revert to the official firmware, you can also flash the latest official firmware using https://crosspointreader.com/#flash-tools.
+To flash a specific build, download a `firmware.bin` from
+[Releases](https://github.com/0xKnowles/KomaOS/releases) or a CI artifact, then choose **Custom .bin**.
 
 ### Command line
 
-1. Install [`esptool`](https://github.com/espressif/esptool):
-
 ```bash
 pip install esptool
+esptool --chip esp32c3 --port /dev/ttyACM0 write-flash 0x0 firmware.bin
 ```
 
-2. Download `firmware.bin` from the [releases page](https://github.com/0xKnowles/KomaOS/releases).
-3. Connect your device via USB-C.
-4. Find the device port. On Linux, run `dmesg` after connecting. On macOS:
+Reverting to stock firmware uses the same flash tool.
+
+## Build from source
 
 ```bash
-log stream --predicate 'subsystem == "com.apple.iokit"' --info
+git clone --recursive https://github.com/0xKnowles/KomaOS.git
+cd KomaOS
+pio run                 # build
+pio run -t upload       # build and flash
+pio device monitor      # serial log
 ```
 
-5. Flash:
+If you cloned without `--recursive`: `git submodule update --init --recursive`.
 
-```bash
-esptool.py --chip esp32c3 --port /dev/ttyACM0 --baud 921600 write_flash 0x10000 /path/to/firmware.bin
-```
-
-Adjust `/dev/ttyACM0` to match your system.
-
-### Manual
-
-See [Development quick start](#development-quick-start) below.
-
----
-
-## Custom SD-card fonts
-
-Convert your own TTF/OTF files into `.cpfont` files that load from the SD card. No firmware reflash is needed.
-
-1. Go to https://crosspointreader.com/fonts and open the "SD-card font builder" form.
-2. Upload up to four styles (regular, bold, italic, bold-italic), set the family name, point sizes, and Unicode range.
-3. Download the generated `.cpfont` files.
-4. Copy them to your SD card under `/fonts/YourFont/` (or `/.fonts/YourFont/` to hide the folder).
-5. Select the font on the device from the font settings.
-
-Conversion runs the firmware repo's `lib/EpdFont/scripts/fontconvert_sdcard.py` script unmodified, so output matches a local host build.
-
----
+Requires [PlatformIO](https://platformio.org/). Before opening a PR, run `./bin/clang-format-fix`
+and `pio check` — CI enforces both, alongside the host test suite (`cmake -S test -B build && ctest`).
 
 ## Documentation
 
-- [User Guide](./USER_GUIDE.md)
-- [Web server usage](./docs/webserver.md)
-- [Web server endpoints](./docs/webserver-endpoints.md)
-- [Project scope](./SCOPE.md)
-- [Contributing docs](./docs/contributing/README.md)
-- [Touch and UI development](./docs/contributing/touch-and-ui.md) - FreeInkUI components for new screens, the touch bridge for existing ones, and build envs for the non-Xteink touch devices
+| | |
+|---|---|
+| [Contributing](docs/contributing) | Development setup and conventions |
+| [File formats](docs/file-formats.md) | XTC/XTCH, cache layout, on-card structures |
+| [Activity manager](docs/activity-manager.md) | The UI lifecycle everything is built on |
+| [Dictionary](docs/dictionary.md) | StarDict setup |
+| [SD-card fonts](docs/sd-card-fonts.md) | Installing custom fonts |
+| [i18n](docs/i18n.md) | Adding or editing translations |
+| [Unbricking](docs/fix-bricked-xteink.md) | Recovery for a USB-locked device |
 
----
+## Relationship to CrossPoint Reader
 
-## Development quick start
+KomaOS is a friendly fork of [crosspoint-reader](https://github.com/crosspoint-reader/crosspoint-reader)
+by Dave Allie and contributors, MIT licensed, with full history preserved. Upstream fixes are merged in
+regularly, and everything upstream does still works here — KomaOS adds the manga layer rather than
+replacing the reader.
 
-### Prerequisites
+**Bugs in shared code are best reported upstream. Bugs in anything manga-specific belong here.**
 
-- [pioarduino](https://github.com/pioarduino/pioarduino) or VS Code + pioarduino plugin
-- Python 3.8+
-- `clang-format` 21
-- USB-C cable supporting data transfer
+## License
 
-### Setup
-
-```bash
-git clone --recursive https://github.com/0xKnowles/KomaOS
-cd komaos
-
-# if cloned without --recursive:
-git submodule update --init --recursive
-```
-
-### Nix/NixOS
-
-Nix/NixOS users can enter the development shell with either `nix develop` (flakes) or `nix-shell`:
-
-```bash
-nix develop -f nix
-# or
-nix-shell nix
-```
-
-To flash a connected ESP32-C3 device, enable PlatformIO's udev rules in your NixOS configuration:
-
-```nix
-services.udev.packages = with pkgs; [ platformio-core.udev ];
-```
-
-After rebuilding the system configuration, reconnect the device or reload udev rules.
-
-### Build / flash / monitor
-
-```bash
-pio run --target upload
-```
-
-### Contributor pre-PR checks
-
-```bash
-./bin/clang-format-fix
-pio check -e default
-pio run -e default
-```
-
-### Debugging
-
-After flashing the new features, it’s recommended to capture detailed logs from the serial port.
-
-First, make sure all required Python packages are installed:
-
-```python
-python3 -m pip install pyserial colorama matplotlib
-```
-
-After that run the script:
-
-```sh
-# For Linux
-# This was tested on Debian and should work on most Linux systems.
-python3 scripts/debugging_monitor.py
-
-# For macOS
-python3 scripts/debugging_monitor.py /dev/cu.usbmodem2101
-```
-
-Minor adjustments may be required for Windows.
-
----
-
-## Internals
-
-KomaOS is pretty aggressive about caching data down to the SD card to minimise RAM usage. The ESP32-C3 only has ~380KB of usable RAM, so we have to be careful. A lot of the decisions made in the design of the firmware were based on this constraint.
-
-### Data caching
-
-The first time chapters of a book are loaded, they are cached to the SD card. Subsequent loads are served from the
-cache. This cache directory exists at `.komaos` on the SD card. The structure is as follows:
-
-```text
-.komaos/
-├── epub_<hash>/         # one directory per book, named by content hash
-│   ├── progress.bin     # reading position (chapter, page, etc.)
-│   ├── cover.bmp        # generated cover image
-│   ├── book.bin         # metadata: title, author, spine, TOC
-│   ├── css_rules.cache  # parsed CSS rule cache
-│   ├── img_*            # rendered image cache files
-│   └── sections/        # per-chapter layout cache
-│       ├── 0.bin
-│       ├── 1.bin
-│       └── ...
-├── settings.json        # device settings
-├── state.json           # resume/runtime state
-└── recent.json          # recent books list
-```
-
-Removing `/.komaos` clears all cached metadata and forces a full regeneration on next open. Book deletes, overwrites, and moves done through the firmware or web UI clear or re-key matching caches; manual SD-card edits may leave stale cache directories behind.
-
-For more details on the internal file structures, see the [file formats document](./docs/file-formats.md).
-
----
-
-## Contributing
-
-Contributions are welcome. If you're new to the codebase, start with the [contributing docs](./docs/contributing/README.md). For things to work on, check the [ideas discussion board](https://github.com/0xKnowles/KomaOS/discussions/categories/ideas) — leave a comment before starting so we don't duplicate effort.
-
-Everyone here is a volunteer, so please be respectful and patient. For governance and community expectations, see [GOVERNANCE.md](./GOVERNANCE.md).
-
----
-
-## Community forks
-
-One of the best things about open source is that anyone can take the code in a different direction. If you need something outside KomaOS's [scope](./SCOPE.md), check out the community forks:
-
-- [CrossInk](https://github.com/uxjulia/CrossInk) — Typography and reading tracking: Bionic Reading (bolds word stems to create fixation points), guide dots between words, improved paragraph indents, and replaces the default fonts with ChareInk/Lexend/Bitter.
-
-- [papyrix-reader](https://github.com/bigbag/papyrix-reader) — Adds FB2 and MD format support. Actively maintained with Arabic script support. Custom themes via SD card.
-
-- ~~[crosspet](https://github.com/trilwu/crosspet) — A Vietnamese fork that adds a Tamagotchi-style virtual chicken that grows based on your reading milestones (pages read, streaks, care). Also: Flashcards, Weather, Pomodoro timer, and mini-games.~~ (Unmaintained)
-
-- [crosspoint-cjk](https://github.com/aBER0724/crosspoint-cjk) — Purpose-built for Chinese, Japanese, and Korean reading.
-
-- [inx](https://github.com/obijuankenobiii/inx) — Completely reimagines the user interface with tabbed navigation.
-
-- ~~[PlusPoint](https://github.com/ngxson/pluspoint-reader) — custom JS apps support.~~ (Unmaintained)
-
-- [crosspoint-papers3](https://github.com/juicecultus/crosspoint-papers3) — KomaOS port for M5Stack Paper S3. 
-
-- [t5s3-reader](https://github.com/ShallowGreen123/t5s3-reader) — KomaOS port for LilyGo T5 ePaper S3 / T5S3 4.7-inch e-paper device.
-
-**Note:** Many of these features will make their way into KomaOS over time. We maintain a slower pace to ensure rock-solid stability and squash bugs before they reach your device.
-
-Want to build your own device? Be sure to check out the [de-link](https://github.com/iandchasse/de-link) project.
-
----
-
-KomaOS is **not affiliated with Xteink or any device manufacturer**.
-
-Huge shoutout to [diy-esp32-epub-reader](https://github.com/atomic14/diy-esp32-epub-reader), which inspired this project.
+MIT — see [LICENSE](LICENSE). Original work © Dave Allie and CrossPoint Reader contributors.
