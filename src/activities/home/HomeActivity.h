@@ -15,7 +15,6 @@ class HomeActivity final : public Activity {
   bool recentsLoading = false;
   bool recentsLoaded = false;
   bool firstRenderDone = false;
-  bool hasOpdsServers = false;
   bool coverRendered = false;      // Track if cover has been rendered once
   bool coverBufferStored = false;  // Track if cover buffer is stored
   // Home can be entered while Back is still held (e.g. leaving Settings with
@@ -33,30 +32,29 @@ class HomeActivity final : public Activity {
   std::vector<RecentBook> recentBooks;
   const HomeMenuItem initialMenuItem;
 
+  // The menu is a fixed list. OPDS used to be inserted only when a server was
+  // configured, which made the row order depend on runtime state; it now always
+  // sits last and opens the server list, where an empty store offers "add
+  // server" rather than a dead end. KomaUI's background inks exactly MENU_COUNT
+  // rows, so a list that changes length leaves an empty box on the page.
+  static constexpr int MENU_COUNT = 5;
+  static constexpr HomeMenuItem MENU_ORDER[MENU_COUNT] = {
+      HomeMenuItem::BOOKS,         HomeMenuItem::MANGA,        HomeMenuItem::FILE_TRANSFER,
+      HomeMenuItem::SETTINGS_MENU, HomeMenuItem::OPDS_BROWSER,
+  };
+
   // Convert HomeMenuItem to menu index (used in onEnter)
-  static int menuItemToIndex(HomeMenuItem item, bool hasOpdsUrl) {
-    int i = 0;
-    if (item == HomeMenuItem::BOOKS) return i;
-    ++i;
-    if (item == HomeMenuItem::MANGA) return i;
-    ++i;
-    if (item == HomeMenuItem::OPDS_BROWSER) return hasOpdsUrl ? i : 0;
-    if (hasOpdsUrl) ++i;
-    if (item == HomeMenuItem::FILE_TRANSFER) return i;
-    ++i;
-    if (item == HomeMenuItem::SETTINGS_MENU) return i;
+  static int menuItemToIndex(HomeMenuItem item) {
+    for (int i = 0; i < MENU_COUNT; i++) {
+      if (MENU_ORDER[i] == item) return i;
+    }
     return 0;
   }
 
   // Convert menu index to HomeMenuItem (used in loop)
-  static HomeMenuItem indexToMenuItem(int idx, bool hasOpdsUrl) {
-    int i = 0;
-    if (idx == i++) return HomeMenuItem::BOOKS;
-    if (idx == i++) return HomeMenuItem::MANGA;
-    if (hasOpdsUrl && idx == i++) return HomeMenuItem::OPDS_BROWSER;
-    if (idx == i++) return HomeMenuItem::FILE_TRANSFER;
-    if (idx == i) return HomeMenuItem::SETTINGS_MENU;
-    return HomeMenuItem::NONE;
+  static HomeMenuItem indexToMenuItem(int idx) {
+    if (idx < 0 || idx >= MENU_COUNT) return HomeMenuItem::NONE;
+    return MENU_ORDER[idx];
   }
   void onSelectBook(const std::string& path);
   void onBooksOpen();

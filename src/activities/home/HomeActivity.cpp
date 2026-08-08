@@ -16,22 +16,12 @@
 #include "KomaSettings.h"
 #include "KomaState.h"
 #include "MappedInputManager.h"
-#include "OpdsServerStore.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 #include "util/SeriesTitle.h"
 
-int HomeActivity::getMenuItemCount() const {
-  int count = 4;  // File Browser, Recents, File transfer, Settings
-  if (!recentBooks.empty()) {
-    count += recentBooks.size();
-  }
-  if (hasOpdsServers) {
-    count++;
-  }
-  return count;
-}
+int HomeActivity::getMenuItemCount() const { return MENU_COUNT + static_cast<int>(recentBooks.size()); }
 
 void HomeActivity::loadRecentBooks(int maxBooks) {
   recentBooks.clear();
@@ -124,13 +114,11 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
 void HomeActivity::onEnter() {
   Activity::onEnter();
 
-  hasOpdsServers = OPDS_STORE.hasServers();
-
   const auto& metrics = UITheme::getInstance().getMetrics();
   loadRecentBooks(metrics.homeRecentBooksCount);
 
   const auto base = static_cast<int>(recentBooks.size());
-  selectorIndex = initialMenuItem == HomeMenuItem::NONE ? 0 : base + menuItemToIndex(initialMenuItem, hasOpdsServers);
+  selectorIndex = initialMenuItem == HomeMenuItem::NONE ? 0 : base + menuItemToIndex(initialMenuItem);
 
   // Trigger first update
   requestUpdate();
@@ -189,7 +177,7 @@ void HomeActivity::loop() {
       return;
     }
     const int menuIndex = selectorIndex - static_cast<int>(recentBooks.size());
-    switch (indexToMenuItem(menuIndex, hasOpdsServers)) {
+    switch (indexToMenuItem(menuIndex)) {
       case HomeMenuItem::BOOKS:
         onBooksOpen();
         break;
@@ -312,14 +300,11 @@ void HomeActivity::render(RenderLock&&) {
                           recentBooks, selectorIndex, coverRendered, coverBufferStored, bufferRestored,
                           std::bind(&HomeActivity::storeCoverBuffer, this));
 
-  // Build menu items dynamically
-  std::vector<const char*> menuItems = {tr(STR_BOOKS), tr(STR_MANGA), tr(STR_FILE_TRANSFER), tr(STR_SETTINGS_TITLE)};
-  std::vector<UIIcon> menuIcons = {Folder, Library, Transfer, Settings};
-
-  if (hasOpdsServers) {
-    menuItems.insert(menuItems.begin() + 2, tr(STR_OPDS_BROWSER));
-    menuIcons.insert(menuIcons.begin() + 2, Library);
-  }
+  // Kept in the order of MENU_ORDER -- the switch in activateSelection maps by
+  // index, so the two lists have to agree.
+  std::vector<const char*> menuItems = {tr(STR_BOOKS), tr(STR_MANGA), tr(STR_FILE_TRANSFER), tr(STR_SETTINGS_TITLE),
+                                        tr(STR_OPDS_BROWSER)};
+  std::vector<UIIcon> menuIcons = {Folder, Library, Transfer, Settings, Wifi};
 
   if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
     // Insert Continue Reading at the top if enabled in theme
