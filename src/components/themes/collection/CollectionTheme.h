@@ -45,8 +45,11 @@ namespace CollectionMetrics {
  */
 struct Panel {
   int x, y, w, h;
-  int right() const { return x + w; }
-  int bottom() const { return y + h; }
+  // constexpr, not just const: the static_asserts below and the metrics lambda
+  // both call these in constant expressions, and a member function is not
+  // implicitly constexpr.
+  constexpr int right() const { return x + w; }
+  constexpr int bottom() const { return y + h; }
 };
 
 constexpr Panel BANNER{30, 42, 420, 55};
