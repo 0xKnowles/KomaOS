@@ -1,4 +1,4 @@
-#include "CollectionTheme.h"
+#include "KomaUiTheme.h"
 
 #include <GfxRenderer.h>
 #include <HalStorage.h>
@@ -21,7 +21,7 @@
 
 // File scope, not inside the anonymous namespace below: the member functions
 // need the panel metrics too.
-using namespace CollectionMetrics;
+using namespace KomaUiMetrics;
 
 namespace {
 
@@ -75,9 +75,9 @@ void drawPanelLabel(const GfxRenderer& renderer, const RecentBook& book, const P
 
 }  // namespace
 
-void CollectionTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
-                                          const int selectorIndex, bool& coverRendered, bool& coverBufferStored,
-                                          bool& bufferRestored, std::function<bool()> storeCoverBuffer) const {
+void KomaUiTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
+                                      const int selectorIndex, bool& coverRendered, bool& coverBufferStored,
+                                      bool& bufferRestored, std::function<bool()> storeCoverBuffer) const {
   // Deliberately not using the cover cache. It snapshots one sub-rect, but this
   // theme paints the whole page including the area under the menu, so a partial
   // restore would leave the background cleared below the tile. Redrawing costs
@@ -126,8 +126,8 @@ void CollectionTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, cons
   drawStatsKoma(renderer, rect, recentBooks, selectorIndex);
 }
 
-void CollectionTheme::drawStatsKoma(const GfxRenderer& renderer, const Rect, const std::vector<RecentBook>& recentBooks,
-                                    const int selectorIndex) const {
+void KomaUiTheme::drawStatsKoma(const GfxRenderer& renderer, const Rect, const std::vector<RecentBook>& recentBooks,
+                                const int selectorIndex) const {
   const int bookCount = std::min(static_cast<int>(recentBooks.size()), PANEL_COUNT);
   const bool hasSelection = selectorIndex >= 0 && selectorIndex < bookCount;
 
@@ -166,9 +166,9 @@ void CollectionTheme::drawStatsKoma(const GfxRenderer& renderer, const Rect, con
   }
 }
 
-void CollectionTheme::drawButtonMenu(GfxRenderer& renderer, Rect, int buttonCount, int selectedIndex,
-                                     const std::function<std::string(int index)>& buttonLabel,
-                                     const std::function<UIIcon(int index)>& rowIcon) const {
+void KomaUiTheme::drawButtonMenu(GfxRenderer& renderer, Rect, int buttonCount, int selectedIndex,
+                                 const std::function<std::string(int index)>& buttonLabel,
+                                 const std::function<UIIcon(int index)>& rowIcon) const {
   // Labels only, placed in the rows the background already inks. Not delegated
   // to Lyra: its rows draw their own fills and icons, which is exactly the
   // furniture this theme exists to get rid of.
@@ -191,8 +191,7 @@ void CollectionTheme::drawButtonMenu(GfxRenderer& renderer, Rect, int buttonCoun
   }
 }
 
-void CollectionTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title,
-                                 const char* subtitle) const {
+void KomaUiTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle) const {
   LyraTheme::drawHeader(renderer, rect, title, subtitle);
   // Same edge treatment as a shelf ledge, so file browser, settings and reader
   // screens all read as part of the same theme rather than plain Lyra with a

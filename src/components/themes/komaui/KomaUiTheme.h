@@ -8,7 +8,7 @@
 class GfxRenderer;
 
 /**
- * Collection: the home screen as a page of manga panels.
+ * KomaUI: the home screen as a page of manga panels.
  *
  * A hero cover with two smaller panels stacked beside it and a stats koma
  * closing the block. Panel edges are slanted a few pixels and no two lean the
@@ -32,7 +32,7 @@ class GfxRenderer;
  * overrides the home block, the menu styling and the header rule.
  */
 
-namespace CollectionMetrics {
+namespace KomaUiMetrics {
 
 /**
  * Panel interiors of src/images/KomaBackground.h, in logical coordinates.
@@ -94,15 +94,15 @@ constexpr ThemeMetrics values = [] {
   return v;
 }();
 
-}  // namespace CollectionMetrics
+}  // namespace KomaUiMetrics
 
-class CollectionTheme : public LyraTheme {
+class KomaUiTheme : public LyraTheme {
   // Progress for the four volumes on the shelf, read once when the shelf is
   // composed rather than on every selector move -- the stats box reads whichever
   // volume is selected, and four SD opens per frame to redraw one 44px box is
   // not a trade worth making. Mutable because the draw methods are const, the
   // same reason LyraTheme::coverWidth is.
-  mutable std::array<XtcProgress::Snapshot, CollectionMetrics::PANEL_COUNT> shelfProgress{};
+  mutable std::array<XtcProgress::Snapshot, KomaUiMetrics::PANEL_COUNT> shelfProgress{};
   mutable bool shelfProgressLoaded = false;
 
   void drawStatsKoma(const GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,

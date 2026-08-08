@@ -11,7 +11,7 @@
 #include "MappedInputManager.h"
 #include "RecentBooksStore.h"
 #include "components/themes/BaseTheme.h"
-#include "components/themes/collection/CollectionTheme.h"
+#include "components/themes/komaui/KomaUiTheme.h"
 #include "components/themes/lyra/Lyra3CoversTheme.h"
 #include "components/themes/lyra/LyraTheme.h"
 #include "components/themes/roundedraff/RoundedRaffTheme.h"
@@ -50,10 +50,10 @@ void UITheme::setTheme(KomaSettings::UI_THEME type) {
       currentTheme = std::make_unique<Lyra3CoversTheme>();
       currentMetrics = &Lyra3CoversMetrics::values;
       break;
-    case KomaSettings::UI_THEME::COLLECTION:
-      LOG_DBG("UI", "Using Collection theme");
-      currentTheme = std::make_unique<CollectionTheme>();
-      currentMetrics = &CollectionMetrics::values;
+    case KomaSettings::UI_THEME::KOMAUI:
+      LOG_DBG("UI", "Using KomaUI theme");
+      currentTheme = std::make_unique<KomaUiTheme>();
+      currentMetrics = &KomaUiMetrics::values;
       break;
   }
   metricsValid = false;

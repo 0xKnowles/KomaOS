@@ -17,7 +17,10 @@
 class Activity;    // forward declaration
 class RenderLock;  // forward declaration
 
-enum class HomeMenuItem { NONE, FILE_BROWSER, RECENTS, OPDS_BROWSER, FILE_TRANSFER, SETTINGS_MENU };
+// BOOKS and MANGA both open the file browser, at /books and /manga. They
+// replaced FILE_BROWSER and RECENTS: a manga library is browsed by folder, and
+// the recent list is already the home screen's cover panels.
+enum class HomeMenuItem { NONE, BOOKS, MANGA, OPDS_BROWSER, FILE_TRANSFER, SETTINGS_MENU };
 
 /**
  * ActivityManager
