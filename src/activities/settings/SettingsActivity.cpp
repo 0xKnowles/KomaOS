@@ -194,7 +194,13 @@ void SettingsActivity::loop() {
       requestUpdate();
     } else {
       SETTINGS.saveToFile();
-      onGoHome();
+      // finish(), not onGoHome(): settings is pushed onto the stack when it is
+      // opened from a reader's menu, so Back belongs to whatever opened it --
+      // going home from there loses the reader's place for no reason.
+      // popActivity() falls back to going home when the stack is empty, which
+      // is the case when settings was entered from the home menu, so the
+      // top-level behaviour is unchanged.
+      finish();
     }
     return;
   }
