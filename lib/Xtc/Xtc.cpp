@@ -527,6 +527,27 @@ xtc::XtcSplitGeometry Xtc::getSplitGeometry() const {
   return parser->getSplitGeometry();
 }
 
+bool Xtc::hasPageStartMap() const {
+  if (!loaded || !parser) {
+    return false;
+  }
+  return parser->hasPageStartMap();
+}
+
+uint32_t Xtc::pageGroupStart(const uint32_t pageIndex) const {
+  if (!loaded || !parser) {
+    return pageIndex;
+  }
+  return parser->pageGroupStart(pageIndex);
+}
+
+uint32_t Xtc::stripsInGroup(const uint32_t groupStart) const {
+  if (!loaded || !parser) {
+    return 0;
+  }
+  return parser->stripsInGroup(groupStart);
+}
+
 uint8_t Xtc::getBitDepth() const {
   if (!loaded || !parser) {
     return 1;  // Default to 1-bit

@@ -81,6 +81,29 @@ class Xtc {
   xtc::XtcSplitGeometry getSplitGeometry() const;
 
   /**
+   * True when this volume records where each source page begins.
+   *
+   * False for every volume encoded before converters wrote the map, and when
+   * the map could not be loaded, so callers fall back to grouping by a fixed
+   * step rather than failing.
+   */
+  bool hasPageStartMap() const;
+
+  /**
+   * First strip of the source page that `pageIndex` belongs to.
+   *
+   * Returns `pageIndex` unchanged when there is no map.
+   */
+  uint32_t pageGroupStart(uint32_t pageIndex) const;
+
+  /**
+   * Strips belonging to the source page that starts at `groupStart`.
+   *
+   * Returns 0 when there is no map, which callers read as "use the fixed step".
+   */
+  uint32_t stripsInGroup(uint32_t groupStart) const;
+
+  /**
    * Load page bitmap data
    * @param pageIndex Page index (0-based)
    * @param buffer Output buffer
