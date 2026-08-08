@@ -541,6 +541,16 @@ void loop() {
     return;
   }
 
+  // Capture the screen when the power button is short-pressed with the
+  // SCREENSHOT setting. Handled here rather than per-activity so it works
+  // everywhere, which is the point of a screenshot key.
+  if (SETTINGS.shortPwrBtn == KomaSettings::SHORT_PWRBTN::SCREENSHOT &&
+      mappedInputManager.wasReleased(MappedInputManager::Button::Power)) {
+    LOG_DBG("MAIN", "Screenshot triggered");
+    RenderLock lock;
+    ScreenshotUtil::takeScreenshot(renderer);
+  }
+
   // Refresh screen when power button is short-pressed with FORCE_REFRESH setting.
   if (SETTINGS.shortPwrBtn == KomaSettings::SHORT_PWRBTN::FORCE_REFRESH &&
       mappedInputManager.wasReleased(MappedInputManager::Button::Power)) {
