@@ -65,6 +65,14 @@ class XtcReaderActivity final : public Activity {
   uint32_t leadingStripCount() const;
   /** First strip of the page group `currentPage` falls in. */
   uint32_t pageGroupStart() const;
+  /**
+   * First strip of the page before the current group; 0 at the start.
+   *
+   * Separate from `pageGroupStart() - pageStep()` because the previous page may
+   * be a different length: after a one-strip spread, the page before it is
+   * three strips long, and only the file's page-start map knows that.
+   */
+  uint32_t previousGroupStart() const;
   bool fullViewActive() const;
   // Opens the manga menu (Confirm). Replaces the old direct call into chapter
   // selection, which no-opped on any volume without a TOC.

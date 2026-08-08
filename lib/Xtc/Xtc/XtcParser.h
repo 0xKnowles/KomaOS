@@ -82,6 +82,32 @@ class XtcParser {
   bool hasChapters() const { return m_hasChapters; }
   const std::vector<ChapterInfo>& getChapters();
 
+  /**
+   * True when this file carries a usable page-start map.
+   *
+   * False for every file written before encoders recorded one, and also when
+   * the map could not be loaded, so callers fall back to arithmetic grouping
+   * rather than failing.
+   */
+  bool hasPageStartMap() const { return m_pageStartMap != nullptr; }
+
+  /**
+   * First strip of the source page that `pageIndex` belongs to.
+   *
+   * Answers what `leadingStrips` cannot: a mid-book double-page spread is
+   * landscape, is never split, and emits one strip where its neighbours emit
+   * three, so from that point on a fixed grouping is out of phase for the rest
+   * of the volume. Returns `pageIndex` unchanged when there is no map.
+   */
+  uint32_t pageGroupStart(uint32_t pageIndex) const;
+
+  /**
+   * Strips belonging to the source page that starts at `groupStart`.
+   *
+   * Returns 0 when there is no map, which callers read as "use the fixed step".
+   */
+  uint32_t stripsInGroup(uint32_t groupStart) const;
+
   // Validation
   static bool isValidXtcFile(const char* filepath);
 
@@ -103,12 +129,26 @@ class XtcParser {
   bool m_chaptersLoaded;
   XtcError m_lastError;
 
+  /**
+   * One bit per strip, set where a source page begins; null when absent.
+   *
+   * Held in DRAM rather than re-read per page turn: it is pageCount/8 bytes --
+   * 25 for a 200-page volume, 500 for an unusually long 4000-strip one -- and
+   * every page turn in Full view needs it twice, to find the group's start and
+   * its length. Allocated once at open() and released by close(), so it does
+   * not churn the heap the way a per-turn read would.
+   */
+  std::unique_ptr<uint8_t[]> m_pageStartMap;
+  uint32_t m_pageStartMapBits;
+
   // Internal helper functions
   XtcError readHeader();
   XtcError readFirstPageInfo();
   XtcError readTitle();
   XtcError readAuthor();
   XtcError readChapters();
+  void readPageStartMap();
+  bool isPageStart(uint32_t pageIndex) const;
   bool readPageTableEntry(uint32_t pageIndex, PageInfo& info);
 
   // File handle management — reopen on demand, close after use

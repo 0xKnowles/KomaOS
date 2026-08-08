@@ -322,8 +322,12 @@ void XtcReaderActivity::loop() {
     // Step from the group's first strip, not from wherever inside it the
     // reader happens to be, so a turn back in Full view lands on a page
     // boundary rather than drifting off one.
-    const uint32_t from = fullViewActive() ? pageGroupStart() : currentPage;
-    currentPage = from >= static_cast<uint32_t>(skipAmount) ? from - skipAmount : 0;
+    if (fullViewActive() && !skipPages) {
+      currentPage = previousGroupStart();
+    } else {
+      const uint32_t from = fullViewActive() ? pageGroupStart() : currentPage;
+      currentPage = from >= static_cast<uint32_t>(skipAmount) ? from - skipAmount : 0;
+    }
     requestUpdate();
   } else if (nextTriggered) {
     currentPage = (fullViewActive() ? pageGroupStart() : currentPage) + skipAmount;
@@ -681,7 +685,19 @@ bool XtcReaderActivity::fullViewActive() const {
   return true;
 }
 
-uint32_t XtcReaderActivity::pageStep() const { return fullViewActive() ? FullPageLayout::STRIPS_PER_PAGE : 1; }
+uint32_t XtcReaderActivity::pageStep() const {
+  if (!fullViewActive()) return 1;
+
+  // With a page-start map the step is whatever the current page actually
+  // occupies, which is the point of the map: a mid-book spread is landscape,
+  // so it is never split and takes one strip where its neighbours take three.
+  // Stepping by a fixed three from there lands mid-page for the rest of the
+  // volume.
+  const uint32_t strips = xtc->stripsInGroup(xtc->pageGroupStart(currentPage));
+  if (strips > 0) return strips;
+
+  return FullPageLayout::STRIPS_PER_PAGE;
+}
 
 uint32_t XtcReaderActivity::leadingStripCount() const {
   // The cover is encoded nosplit, so it is one strip on its own and every group
@@ -700,6 +716,17 @@ uint32_t XtcReaderActivity::leadingStripCount() const {
 }
 
 uint32_t XtcReaderActivity::pageGroupStart() const {
+  if (!fullViewActive()) {
+    return currentPage;
+  }
+
+  // The file's own record of where pages begin beats any arithmetic, and beats
+  // the manual slice offset too: the offset exists precisely because grouping
+  // by a fixed step drifts, and a map means it cannot.
+  if (xtc->hasPageStartMap()) {
+    return xtc->pageGroupStart(currentPage);
+  }
+
   const uint32_t step = pageStep();
   if (step <= 1) {
     return currentPage;
@@ -710,6 +737,20 @@ uint32_t XtcReaderActivity::pageGroupStart() const {
     return currentPage;  // Still in the lead-in; each of those stands alone.
   }
   return leading + ((currentPage - leading) / step) * step;
+}
+
+uint32_t XtcReaderActivity::previousGroupStart() const {
+  const uint32_t start = pageGroupStart();
+  if (start == 0) return 0;
+
+  // Stepping back by the CURRENT group's length is wrong exactly where the map
+  // matters: after a one-strip spread, the page before it is three strips long.
+  if (xtc->hasPageStartMap()) {
+    return xtc->pageGroupStart(start - 1);
+  }
+
+  const uint32_t step = pageStep();
+  return start >= step ? start - step : 0;
 }
 
 bool XtcReaderActivity::renderFullPage() {
@@ -757,6 +798,16 @@ bool XtcReaderActivity::renderFullPage() {
   if (firstStrip < leadingStripCount()) {
     return false;
   }
+
+  // A page that occupies fewer strips than the layout stacks is a page that was
+  // never split -- a double-page spread, which is already a whole page. Falling
+  // back to the single-strip render shows it as one image instead of splicing
+  // the next page's strips beneath it.
+  const uint32_t groupStrips = xtc->stripsInGroup(firstStrip);
+  if (groupStrips > 0 && groupStrips < static_cast<uint32_t>(FullPageLayout::STRIPS_PER_PAGE)) {
+    return false;
+  }
+
   for (int i = 0; i < FullPageLayout::STRIPS_PER_PAGE; i++) {
     const FullPageLayout::StripPlacement& placement = layout.strips[i];
     if (!placement.contributes()) continue;

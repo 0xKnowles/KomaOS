@@ -10,6 +10,7 @@
 #include <FsHelpers.h>
 #include <HalStorage.h>
 #include <Logging.h>
+#include <Memory.h>
 
 #include <cstring>
 
@@ -24,7 +25,8 @@ XtcParser::XtcParser()
       m_bitDepth(1),
       m_hasChapters(false),
       m_chaptersLoaded(false),
-      m_lastError(XtcError::OK) {
+      m_lastError(XtcError::OK),
+      m_pageStartMapBits(0) {
   memset(&m_header, 0, sizeof(m_header));
 }
 
@@ -91,6 +93,10 @@ XtcError XtcParser::open(const char* filepath) {
   m_hasChapters = (m_header.hasChapters == 1 && m_header.pageTableOffset >= sizeof(XtcHeader));
   m_chaptersLoaded = false;
 
+  // Must run while the file is still open; a missing or unreadable map is not
+  // fatal, the reader just falls back to grouping by a fixed step.
+  readPageStartMap();
+
   // Close the source file to free its internal SdFat buffers.
   // It will be reopened on-demand for page table lookups and bitmap reads.
   m_file.close();
@@ -108,7 +114,92 @@ void XtcParser::close() {
   m_title.clear();
   m_author.clear();
   m_hasChapters = false;
+  m_pageStartMap.reset();
+  m_pageStartMapBits = 0;
   memset(&m_header, 0, sizeof(m_header));
+}
+
+/**
+ * Loads the page-start map that follows the page table.
+ *
+ * Its position is implied rather than stored: there is no free qword left in
+ * the header to hold an offset. 0x28 is the split geometry this flag lives in,
+ * and 0x30 holds the chapter offset -- which FlipNzb writes as one 8-byte qword
+ * spanning 0x30-0x37 while this parser reads the same span as two uint32s. They
+ * agree only because the high half is always zero, so 0x34 is not spare.
+ *
+ * Sitting after the page table also keeps the map clear of readChapters(),
+ * which derives its entry count from the gap up to pageTableOffset and would
+ * otherwise read the map's bytes as chapter entries.
+ */
+void XtcParser::readPageStartMap() {
+  m_pageStartMap.reset();
+  m_pageStartMapBits = 0;
+
+  const XtcSplitGeometry geometry = decodeSplitGeometry(m_header.splitGeometry);
+  if (!geometry.valid || !geometry.hasPageStartMap) return;
+  if (m_header.pageCount == 0) return;
+
+  const uint32_t pageCount = m_header.pageCount;
+  const uint32_t mapBytes = pageStartMapBytes(pageCount);
+  const uint64_t mapOffset = m_header.pageTableOffset + static_cast<uint64_t>(pageCount) * sizeof(PageTableEntry);
+
+  // The map has to fit between the page table and the end of the file. A file
+  // claiming a map it does not have is treated as a file without one.
+  const uint64_t fileSize = m_file.fileSize64();
+  if (mapOffset > fileSize || mapBytes > fileSize - mapOffset) {
+    LOG_DBG("XTC", "Page-start map out of bounds: offset=%llu bytes=%lu file=%llu",
+            static_cast<unsigned long long>(mapOffset), static_cast<unsigned long>(mapBytes),
+            static_cast<unsigned long long>(fileSize));
+    return;
+  }
+
+  auto map = makeUniqueNoThrow<uint8_t[]>(mapBytes);
+  if (!map) {
+    LOG_ERR("XTC", "OOM: page-start map %lu bytes", static_cast<unsigned long>(mapBytes));
+    return;
+  }
+
+  if (!m_file.seek64(mapOffset)) {
+    LOG_DBG("XTC", "Failed to seek to page-start map at %llu", static_cast<unsigned long long>(mapOffset));
+    return;
+  }
+  if (m_file.read(map.get(), mapBytes) != mapBytes) {
+    LOG_DBG("XTC", "Failed to read page-start map (%lu bytes)", static_cast<unsigned long>(mapBytes));
+    return;
+  }
+
+  m_pageStartMap = std::move(map);
+  m_pageStartMapBits = pageCount;
+  LOG_DBG("XTC", "Page-start map loaded: %lu bytes for %lu pages", static_cast<unsigned long>(mapBytes),
+          static_cast<unsigned long>(pageCount));
+}
+
+bool XtcParser::isPageStart(const uint32_t pageIndex) const {
+  if (!m_pageStartMap || pageIndex >= m_pageStartMapBits) return false;
+  // MSB first within each byte, matching how the encoder packs it.
+  return ((m_pageStartMap[pageIndex >> 3] >> (7 - (pageIndex & 7))) & 1) != 0;
+}
+
+uint32_t XtcParser::pageGroupStart(const uint32_t pageIndex) const {
+  if (!m_pageStartMap || pageIndex >= m_pageStartMapBits) return pageIndex;
+
+  // Scan back to the nearest set bit. Bounded by the longest run of strips a
+  // page can produce -- ten, the encoder's segment cap -- so this is a handful
+  // of byte tests, not a walk over the volume.
+  for (uint32_t i = pageIndex + 1; i-- > 0;) {
+    if (isPageStart(i)) return i;
+  }
+  return pageIndex;
+}
+
+uint32_t XtcParser::stripsInGroup(const uint32_t groupStart) const {
+  if (!m_pageStartMap || groupStart >= m_pageStartMapBits) return 0;
+
+  for (uint32_t i = groupStart + 1; i < m_pageStartMapBits; i++) {
+    if (isPageStart(i)) return i - groupStart;
+  }
+  return m_pageStartMapBits - groupStart;
 }
 
 bool XtcParser::ensureFileOpen() {

@@ -55,10 +55,25 @@ struct XtcSplitGeometry {
   uint16_t overlapPerMille;      // overlap between strips, per-mille of one strip
   uint8_t rotationQuarterTurns;  // quarter turns clockwise applied when storing a strip
   uint8_t leadingStrips;         // strips before the split run begins (the cover)
+  bool hasPageStartMap;          // a page-start map follows the page table
   bool valid;
 
   int overlapPercent() const { return (overlapPerMille + 5) / 10; }
 };
+
+/**
+ * Bit 34 of the 0x28 qword: a page-start map follows the page table.
+ *
+ * Reusing a spare bit of this field rather than bumping versionMinor is
+ * deliberate. readHeader() accepts only versions 1.0 and 0.1, so a 1.1 file
+ * would be rejected outright by every build already in the field -- a file that
+ * will not open at all is strictly worse than one whose extra bitmap is
+ * ignored. Encoders that predate the map leave this bit clear.
+ */
+constexpr uint64_t XTC_SPLIT_HAS_PAGE_START_MAP = 1ULL << 34;
+
+/** Bytes a page-start map occupies for a given page count: one bit per page. */
+constexpr uint32_t pageStartMapBytes(const uint32_t pageCount) { return (pageCount + 7) / 8; }
 
 /** Unpacks the 0x28 qword. Zero -- every pre-existing file -- yields valid=false. */
 inline XtcSplitGeometry decodeSplitGeometry(const uint64_t packed) {
@@ -69,6 +84,7 @@ inline XtcSplitGeometry decodeSplitGeometry(const uint64_t packed) {
   g.overlapPerMille = static_cast<uint16_t>((packed >> 16) & 0xFFFF);
   g.rotationQuarterTurns = static_cast<uint8_t>((packed >> 32) & 0x03);
   g.leadingStrips = static_cast<uint8_t>((packed >> 40) & 0xFF);
+  g.hasPageStartMap = (packed & XTC_SPLIT_HAS_PAGE_START_MAP) != 0;
   g.valid = g.stripsPerPage > 0;
   return g;
 }
