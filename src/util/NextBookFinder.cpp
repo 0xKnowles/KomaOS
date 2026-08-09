@@ -9,6 +9,7 @@
 #include <string_view>
 
 #include "KomaSettings.h"
+#include "SeriesTitle.h"
 
 namespace {
 constexpr size_t NAME_BUFFER_SIZE = 500;
@@ -30,6 +31,10 @@ std::vector<std::string> NextBookFinder::findNextBooks(const std::string& curren
   const auto lastSlash = currentBookPath.find_last_of('/');
   const std::string currentName =
       lastSlash == std::string::npos ? currentBookPath : currentBookPath.substr(lastSlash + 1);
+  // Only set when the finished book itself parses as a volume of a series --
+  // an unmarked standalone book has nothing to match, so it falls back to
+  // "whatever sorts next" below.
+  const bool matchSeries = SeriesTitle::parse(currentName).hasVolume();
 
   auto dir = Storage.open(folder.c_str());
   if (!dir || !dir.isDirectory()) {
@@ -67,6 +72,9 @@ std::vector<std::string> NextBookFinder::findNextBooks(const std::string& curren
     // Keep only files ordering strictly after the current one; equal names (the book
     // itself, or a case-variant of it) compare "not less" both ways and drop out here.
     if (!FsHelpers::naturalLess(currentName, name)) {
+      continue;
+    }
+    if (matchSeries && !SeriesTitle::sameSeries(currentName, name)) {
       continue;
     }
     // Bounded insertion sort: keep the maxCount lowest-ordering candidates
