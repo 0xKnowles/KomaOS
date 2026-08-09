@@ -217,7 +217,9 @@ class KomaSettings : public PersistableStore<KomaSettings> {
     LP_MENU_DISABLED = 1,
     LP_MENU_BOOKMARK = 2,
     LP_MENU_DICTIONARY = 3,
-    // XTC only: the EPUB reader has no view mode, so it falls through there.
+    // XTC only: the EPUB reader has nothing to peek, so it falls through there.
+    // Holds to show the reassembled full page for as long as Confirm is held,
+    // reverting to the strip on release -- it does not change mangaViewMode.
     LP_MENU_VIEW_MODE = 4,
     LONG_PRESS_MENU_FUNCTION_COUNT
   };

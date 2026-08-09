@@ -249,6 +249,12 @@ void XtcReaderActivity::loop() {
     // release, so the hold does not also open the menu.
     if (ignoreNextConfirmRelease) {
       ignoreNextConfirmRelease = false;
+      // Ends a hold-to-peek: back to the strip currentPage was already on.
+      // currentPage itself was never touched, so this is a pure re-render.
+      if (peekingFullPage) {
+        peekingFullPage = false;
+        requestUpdate();
+      }
       return;
     }
     openReaderMenu();
@@ -259,10 +265,14 @@ void XtcReaderActivity::loop() {
   // here -- bookmarking already has its own menu entry, and KOReader sync and
   // the dictionary are text-reader features with nothing to act on in a paged
   // image. Anything else falls through and Confirm behaves as before.
+  //
+  // This is a peek, not a toggle: holding past the threshold shows the
+  // reassembled full page; releasing (above) reverts to the strip. currentPage
+  // is never written by either edge, so there is nothing to restore.
   if (mappedInput.isPressed(MappedInputManager::Button::Confirm) &&
       SETTINGS.longPressMenuFunction == KomaSettings::LP_MENU_VIEW_MODE &&
       mappedInput.getHeldTime() >= ReaderUtils::BOOKMARK_HOLD_MS && !ignoreNextConfirmRelease) {
-    toggleViewMode();
+    peekingFullPage = true;
     // Latched before the release arrives, so the hold cannot also open the menu
     // and cannot re-fire while the button stays down.
     ignoreNextConfirmRelease = true;
@@ -352,7 +362,11 @@ void XtcReaderActivity::render(RenderLock&&) {
 
   // Full view falls back rather than failing the turn: a layout or allocation
   // that did not work out should still leave the reader on a readable strip.
-  if (!fullViewActive() || !renderFullPage()) {
+  // A peek in progress asks for the same reassembly as the persistent Full
+  // setting, without requiring the setting itself -- canReassembleFullPage()
+  // is the geometry half of fullViewActive() with the setting check dropped.
+  const bool showFullPage = peekingFullPage ? canReassembleFullPage() : fullViewActive();
+  if (!showFullPage || !renderFullPage()) {
     renderPage();
   } else {
     ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh, false, SETTINGS.getMangaRefreshFrequency());
@@ -669,6 +683,10 @@ bool XtcReaderActivity::fullViewActive() const {
   // nosplit encode is one strip per page, and reassembling three of those would
   // stack three unrelated pages.
   if (SETTINGS.mangaViewMode != KomaSettings::MANGA_VIEW_MODE::MANGA_VIEW_FULL) return false;
+  return canReassembleFullPage();
+}
+
+bool XtcReaderActivity::canReassembleFullPage() const {
   // A nosplit encode is one page per strip; stacking three would splice
   // unrelated pages together.
   if (xtc->getPageCount() < FullPageLayout::STRIPS_PER_PAGE) return false;

@@ -32,6 +32,11 @@ class XtcReaderActivity final : public Activity {
   // Set when a long-press fired its bound function, so the release that follows
   // the hold does not also open the menu. Same guard the EPUB reader uses.
   bool ignoreNextConfirmRelease = false;
+  // True for the duration of a hold-to-peek: Confirm has been held past the
+  // threshold with longPressMenuFunction == LP_MENU_VIEW_MODE. render() shows
+  // the reassembled full page while this is set and reverts to the strip on
+  // release, without moving currentPage either way.
+  bool peekingFullPage = false;
   // Next-book suggestion menu for the End-of-Book screen
   EndOfBookOptions endOfBookOptions;
 
@@ -66,6 +71,11 @@ class XtcReaderActivity final : public Activity {
   /** First strip of the page group `currentPage` falls in. */
   uint32_t pageGroupStart() const;
   bool fullViewActive() const;
+  // Whether the current volume's geometry allows reassembling a full page at
+  // all, independent of the persistent Full/Split setting. fullViewActive()
+  // is this plus the setting check; a hold-to-peek needs the geometry check
+  // alone, since it does not touch the setting.
+  bool canReassembleFullPage() const;
   // Opens the manga menu (Confirm). Replaces the old direct call into chapter
   // selection, which no-opped on any volume without a TOC.
   void openReaderMenu();
