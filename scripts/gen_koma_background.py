@@ -74,7 +74,10 @@ def draw_panel(draw, rect, rng):
     # band lies just outside it. Wobble then pushes individual points a pixel
     # either way, so the interior ends up a shade LARGER than the metrics rect
     # -- the safe direction: ink never intrudes into where content is drawn.
-    off = BORDER / 2
+    # Half a border clears the interior on a ruled line, but the wobble below
+    # can push a point inward by up to WOBBLE, which would put ink where cover
+    # art is drawn. Clearing the wobble as well keeps every interior pristine.
+    off = BORDER / 2 + WOBBLE
     left, top = x - off, y - off
     right, bottom = x + w - 1 + off, y + h - 1 + off
 
