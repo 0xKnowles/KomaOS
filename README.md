@@ -11,7 +11,8 @@
 [![Platform](https://img.shields.io/badge/platform-ESP32--C3-red?style=for-the-badge&logo=espressif)](https://www.espressif.com/en/products/socs/esp32-c3)
 [![Hardware](https://img.shields.io/badge/hardware-Xteink%20X3%20%7C%20X4-lightgrey?style=for-the-badge)](https://www.xteink.com/)
 
-<img src="./docs/images/screens/Home.png" alt="KomaOS home screen" width="300">
+<img src="./docs/images/boot-screen.png" alt="KomaOS boot screen" width="272">
+<img src="./docs/images/screens/Home.png" alt="KomaOS home screen" width="272">
 
 </div>
 
