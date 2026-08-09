@@ -30,6 +30,7 @@ class XtcReaderMenuActivity final : public Activity {
     TOGGLE_VIEW_MODE,
     ROTATE_SCREEN,
     SCREENSHOT,
+    LIBRARY_HEALTH_CHECK,
     GO_HOME,
   };
 

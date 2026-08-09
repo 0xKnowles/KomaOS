@@ -29,6 +29,7 @@
 #include "XtcReaderChapterSelectionActivity.h"
 #include "XtcReaderMenuActivity.h"
 #include "XtcReaderPageJumpActivity.h"
+#include "activities/settings/LibraryHealthCheckActivity.h"
 #include "activities/settings/SettingsActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -195,6 +196,11 @@ void XtcReaderActivity::onReaderMenuConfirm(const int action) {
 
     case XtcReaderMenuActivity::MenuAction::SCREENSHOT:
       ScreenshotUtil::takeScreenshot(renderer);
+      break;
+
+    case XtcReaderMenuActivity::MenuAction::LIBRARY_HEALTH_CHECK:
+      startActivityForResult(std::make_unique<LibraryHealthCheckActivity>(renderer, mappedInput),
+                             [this](const ActivityResult&) { requestUpdate(); });
       break;
 
     case XtcReaderMenuActivity::MenuAction::GO_HOME:

@@ -14,6 +14,7 @@
 #include "KOReaderSettingsActivity.h"
 #include "KomaSettings.h"
 #include "LanguageSelectActivity.h"
+#include "LibraryHealthCheckActivity.h"
 #include "MappedInputManager.h"
 #include "OpdsServerListActivity.h"
 #include "OtaUpdateActivity.h"
@@ -130,6 +131,7 @@ void SettingsActivity::rebuildSettingsLists() {
   }
   systemSettings.push_back(SettingInfo::Action(StrId::STR_SD_FIRMWARE_UPDATE, SettingAction::SdFirmwareUpdate));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
+  mangaSettings.push_back(SettingInfo::Action(StrId::STR_LIBRARY_HEALTH_CHECK, SettingAction::LibraryHealthCheck));
   readerSettings.insert(readerSettings.begin(),
                         SettingInfo::Action(StrId::STR_TEXT_SETTINGS, SettingAction::TextSettings));
   readerSettings.insert(readerSettings.begin() + 1,
@@ -439,6 +441,9 @@ void SettingsActivity::toggleCurrentSetting() {
         break;
       case SettingAction::Language:
         startActivityForResult(std::make_unique<LanguageSelectActivity>(renderer, mappedInput), resultHandler);
+        break;
+      case SettingAction::LibraryHealthCheck:
+        startActivityForResult(std::make_unique<LibraryHealthCheckActivity>(renderer, mappedInput), resultHandler);
         break;
       case SettingAction::None:
         // Do nothing

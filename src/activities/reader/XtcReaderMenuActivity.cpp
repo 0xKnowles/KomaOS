@@ -27,7 +27,7 @@ XtcReaderMenuActivity::XtcReaderMenuActivity(GfxRenderer& renderer, MappedInputM
 std::vector<XtcReaderMenuActivity::MenuItem> XtcReaderMenuActivity::buildMenuItems(const bool hasChapters,
                                                                                    const bool hasBookmarks) {
   std::vector<MenuItem> items;
-  items.reserve(9);
+  items.reserve(10);
   // Quick jump first: in a 600-strip volume it is the entry reached for most.
   items.push_back({MenuAction::QUICK_JUMP, StrId::STR_GO_TO_PAGE});
   if (hasBookmarks) {
@@ -44,6 +44,7 @@ std::vector<XtcReaderMenuActivity::MenuItem> XtcReaderMenuActivity::buildMenuIte
   // preference you set once.
   items.push_back({MenuAction::TOGGLE_VIEW_MODE, StrId::STR_MANGA_VIEW_MODE});
   items.push_back({MenuAction::MANGA_SETTINGS, StrId::STR_CAT_MANGA});
+  items.push_back({MenuAction::LIBRARY_HEALTH_CHECK, StrId::STR_LIBRARY_HEALTH_CHECK});
   items.push_back({MenuAction::ROTATE_SCREEN, StrId::STR_ORIENTATION});
   items.push_back({MenuAction::SCREENSHOT, StrId::STR_SCREENSHOT_BUTTON});
   items.push_back({MenuAction::GO_HOME, StrId::STR_GO_HOME_BUTTON});
