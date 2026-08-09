@@ -275,6 +275,13 @@ class KomaSettings : public PersistableStore<KomaSettings> {
   // than a page of text, so it wants scrubbing more often than an EPUB does.
   // FOLLOW_GLOBAL defers to refreshFrequency so this is opt-in.
   uint8_t mangaRefreshFrequency = MANGA_REFRESH_FOLLOW_GLOBAL;
+  // Drives the full refresh from accumulated ink coverage (popcounted from the
+  // framebuffer each turn) instead of mangaRefreshFrequency's fixed page count:
+  // a sparse page barely ghosts, a solid-black splash page ghosts badly, and a
+  // page count can't tell the two apart. Off by default -- mangaRefreshFrequency
+  // keeps working unchanged; this is an additional trigger, not a replacement,
+  // and whichever condition comes first schedules the scrub.
+  uint8_t mangaInkAwareRefresh = 0;
   // Pages jumped per long-press in the XTC reader. Was hard-coded to 10.
   uint8_t mangaSkipPages = MANGA_SKIP_10;
   // How a split volume is shown. SPLIT is the encoder's own output, one strip

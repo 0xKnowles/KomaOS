@@ -244,6 +244,8 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                           {StrId::STR_MANGA_REFRESH_GLOBAL, StrId::STR_PAGES_1, StrId::STR_PAGES_3, StrId::STR_PAGES_5,
                            StrId::STR_PAGES_10},
                           "mangaRefreshFrequency", StrId::STR_CAT_MANGA),
+        SettingInfo::Toggle(StrId::STR_MANGA_INK_AWARE_REFRESH, &KomaSettings::mangaInkAwareRefresh,
+                            "mangaInkAwareRefresh", StrId::STR_CAT_MANGA),
         SettingInfo::Enum(StrId::STR_MANGA_SKIP_PAGES, &KomaSettings::mangaSkipPages,
                           {StrId::STR_PAGES_3, StrId::STR_PAGES_6, StrId::STR_PAGES_10, StrId::STR_PAGES_20},
                           "mangaSkipPages", StrId::STR_CAT_MANGA),

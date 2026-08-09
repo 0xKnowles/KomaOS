@@ -60,6 +60,36 @@ constexpr int SPLIT_BAR_GAP = 3;
 /** Side inset for the Split-view title, so it never touches the panel edge. */
 constexpr int SPLIT_TEXT_MARGIN = 8;
 
+// Ink accumulated since the last full (scrubbing) refresh, in bits, that forces
+// an early scrub on the turn after it is crossed -- see render(). Set to three
+// full 480x800 black pages' worth of bits, on the reasoning that a near-solid
+// page ghosts far worse than the sparse pages the page-count cadence is tuned
+// around, so three of them should not go unscrubbed.
+//
+// UNVERIFIED: this number has not been tuned on hardware, and the right value
+// is a property of the panel, not of the arithmetic. Watch the panel for
+// residual ghosting (threshold too high) or for scrubbing on nearly every turn
+// (too low) and adjust.
+constexpr uint32_t INK_REFRESH_THRESHOLD = 3u * 480u * 800u;
+
+// Ink (black) pixel count currently in the framebuffer. drawPixel CLEARS a bit
+// for ink and SETS it for white (GfxRenderer.cpp:543-547), so this popcounts the
+// complement rather than the buffer itself. One pass over 48,000 bytes with a
+// hardware popcount per byte, once per page turn -- against a turn that already
+// costs a full-page decode and a 1-2s panel refresh.
+uint32_t countInkPixels(const GfxRenderer& renderer) {
+  const uint8_t* buffer = renderer.getFrameBuffer();
+  const size_t size = renderer.getBufferSize();
+  if (!buffer) {
+    return 0;
+  }
+  uint32_t ink = 0;
+  for (size_t i = 0; i < size; i++) {
+    ink += static_cast<uint32_t>(__builtin_popcount(static_cast<uint8_t>(~buffer[i])));
+  }
+  return ink;
+}
+
 }  // namespace
 
 void XtcReaderActivity::onEnter() {
@@ -366,6 +396,12 @@ void XtcReaderActivity::render(RenderLock&&) {
     return;
   }
 
+  // Captured before dispatch: renderPage()'s 2-bit branch and
+  // ReaderUtils::displayWithRefreshCycle both scrub exactly when
+  // pagesUntilFullRefresh is at or below this, and then reset it -- so reading it
+  // here predicts whether the render below scrubs, without duplicating the rule.
+  const bool scrubbingThisTurn = pagesUntilFullRefresh <= 1;
+
   // Full view falls back rather than failing the turn: a layout or allocation
   // that did not work out should still leave the reader on a readable strip.
   // A peek in progress asks for the same reassembly as the persistent Full
@@ -377,6 +413,24 @@ void XtcReaderActivity::render(RenderLock&&) {
   } else {
     ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh, false, SETTINGS.getMangaRefreshFrequency());
   }
+
+  if (SETTINGS.mangaInkAwareRefresh) {
+    if (scrubbingThisTurn) {
+      // A scrub just ran -- from the page-count cadence, or from an ink crossing
+      // latched on an earlier turn. Ghosting is cleared, so the total restarts.
+      inkSinceLastFullRefresh = 0;
+    } else {
+      inkSinceLastFullRefresh += countInkPixels(renderer);
+      if (inkSinceLastFullRefresh >= INK_REFRESH_THRESHOLD) {
+        // This page has already gone to the panel in the ordinary (non-scrub)
+        // mode above, so the earliest a scrub can act on the crossing is the
+        // next turn, which re-reads pagesUntilFullRefresh at the top of render().
+        pagesUntilFullRefresh = 1;
+        inkSinceLastFullRefresh = 0;
+      }
+    }
+  }
+
   saveProgress();
 }
 

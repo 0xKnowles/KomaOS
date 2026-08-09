@@ -22,6 +22,10 @@ class XtcReaderActivity final : public Activity {
 
   uint32_t currentPage = 0;
   int pagesUntilFullRefresh = 0;
+  // Running ink-bit total since the last full (scrubbing) refresh, only tracked
+  // when SETTINGS.mangaInkAwareRefresh is on. See render() and the anonymous
+  // countInkPixels() helper in the .cpp.
+  uint32_t inkSinceLastFullRefresh = 0;
   // Resolved once in onEnter() from the setting and the file header, rather
   // than per input event: neither input can change while the book is open.
   bool readingRightToLeft = false;
