@@ -35,6 +35,7 @@
 #include "fontIds.h"
 #include "util/FullPageLayout.h"
 #include "util/ScreenshotUtil.h"
+#include "util/XtcBookmarkThumbnail.h"
 #include "util/XtcBookmarks.h"
 #include "util/XtcProgress.h"
 
@@ -175,9 +176,20 @@ void XtcReaderActivity::toggleViewMode() {
 }
 
 void XtcReaderActivity::toggleBookmarkForCurrentPage() {
-  XtcBookmarks::toggle(bookmarkedPages, currentPage);
+  // Sampled before the toggle because toggle()'s own false return is ambiguous:
+  // it means both "removed" and "refused, list full". Comparing before against
+  // after resolves it, and says whether a thumbnail needs generating or clearing.
+  const bool wasBookmarked = XtcBookmarks::contains(bookmarkedPages, currentPage);
+  const bool nowBookmarked = XtcBookmarks::toggle(bookmarkedPages, currentPage);
   if (!XtcBookmarks::save(xtc->getCachePath(), bookmarkedPages)) {
     LOG_ERR("XTR", "Failed to save bookmarks for page %lu", currentPage);
+  }
+  if (nowBookmarked && !wasBookmarked) {
+    // Best-effort: the bookmarks list falls back to a placeholder when the
+    // thumbnail is missing, so a failure here is not worth undoing the bookmark.
+    XtcBookmarkThumbnail::generate(xtc->getCachePath(), currentPage, *xtc);
+  } else if (wasBookmarked && !nowBookmarked) {
+    XtcBookmarkThumbnail::remove(xtc->getCachePath(), currentPage);
   }
 }
 
@@ -195,14 +207,14 @@ void XtcReaderActivity::onReaderMenuConfirm(const int action) {
       break;
 
     case XtcReaderMenuActivity::MenuAction::BOOKMARKS:
-      startActivityForResult(
-          std::make_unique<XtcReaderBookmarksActivity>(renderer, mappedInput, bookmarkedPages, xtc->getPageCount()),
-          [this](const ActivityResult& result) {
-            if (!result.isCancelled) {
-              currentPage = std::get<PageResult>(result.data).page;
-            }
-            requestUpdate();
-          });
+      startActivityForResult(std::make_unique<XtcReaderBookmarksActivity>(renderer, mappedInput, bookmarkedPages,
+                                                                          xtc->getPageCount(), xtc->getCachePath()),
+                             [this](const ActivityResult& result) {
+                               if (!result.isCancelled) {
+                                 currentPage = std::get<PageResult>(result.data).page;
+                               }
+                               requestUpdate();
+                             });
       break;
 
     case XtcReaderMenuActivity::MenuAction::TOGGLE_BOOKMARK:
