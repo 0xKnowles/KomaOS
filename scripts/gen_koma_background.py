@@ -25,7 +25,7 @@ import random
 import sys
 
 try:
-    from PIL import Image, ImageChops, ImageDraw
+    from PIL import Image, ImageChops, ImageDraw, ImageFilter
 except ImportError:
     sys.exit("Pillow is required: pip install pillow")
 
@@ -104,7 +104,22 @@ def build(seed):
     return image.resize((WIDTH, HEIGHT), Image.LANCZOS)
 
 
-def composite_flowers(boxes, flowers_path, fade):
+def prepare_flowers(image, threshold, thicken):
+    """Make fine line art survive the 1-bit conversion.
+
+    gen_image_header.py cuts at 128, so a grey hairline at 180 does not come out
+    faint -- it comes out WHITE, i.e. gone. Anything below `threshold` is forced
+    to solid black first, then thickened, because a 1px stroke that survives the
+    cut still all but vanishes on a panel with visible pixel structure.
+    """
+    image = image.point(lambda v: 0 if v < threshold else 255, mode="L")
+    for _ in range(thicken):
+        # MinFilter grows the dark regions by one pixel per pass.
+        image = image.filter(ImageFilter.MinFilter(3))
+    return image
+
+
+def composite_flowers(boxes, flowers_path, fade, threshold, thicken):
     """Lay a flowers-only texture behind the panels.
 
     The texture must contain no panel borders of its own -- this draws the boxes,
@@ -115,6 +130,7 @@ def composite_flowers(boxes, flowers_path, fade):
     flowers = Image.open(flowers_path).convert("L")
     if flowers.size != (WIDTH, HEIGHT):
         flowers = flowers.resize((WIDTH, HEIGHT), Image.LANCZOS)
+    flowers = prepare_flowers(flowers, threshold, thicken)
 
     px = flowers.load()
     for x, y, w, h in COVERS + [STATS] + MENU:
@@ -140,11 +156,18 @@ def main():
     parser.add_argument("--flower-fade", type=float, default=0.12, metavar="F",
                         help="fraction of flower ink kept inside a panel, where cover "
                              "art and text are drawn (default: 0.12)")
+    parser.add_argument("--flower-threshold", type=int, default=205, metavar="V",
+                        help="grey level below which flower ink is forced solid black, "
+                             "so hairlines survive the 1-bit cut (default: 205)")
+    parser.add_argument("--flower-thicken", type=int, default=1, metavar="N",
+                        help="passes of 1px stroke thickening on the flower layer "
+                             "(default: 1)")
     args = parser.parse_args()
 
     image = build(args.seed)
     if args.flowers:
-        image = composite_flowers(image, args.flowers, args.flower_fade)
+        image = composite_flowers(image, args.flowers, args.flower_fade,
+                                  args.flower_threshold, args.flower_thicken)
     image.save(args.output)
 
     # Report the interiors so a reader can check them against the header.
