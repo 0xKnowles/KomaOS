@@ -25,7 +25,7 @@ import random
 import sys
 
 try:
-    from PIL import Image, ImageDraw
+    from PIL import Image, ImageChops, ImageDraw
 except ImportError:
     sys.exit("Pillow is required: pip install pillow")
 
@@ -104,20 +104,54 @@ def build(seed):
     return image.resize((WIDTH, HEIGHT), Image.LANCZOS)
 
 
+def composite_flowers(boxes, flowers_path, fade):
+    """Lay a flowers-only texture behind the panels.
+
+    The texture must contain no panel borders of its own -- this draws the boxes,
+    and anything box-shaped in the source will double up. Ink is attenuated
+    inside every panel so decoration never competes with the cover art and text
+    drawn over it at runtime; `fade` is how much survives there (0 = none).
+    """
+    flowers = Image.open(flowers_path).convert("L")
+    if flowers.size != (WIDTH, HEIGHT):
+        flowers = flowers.resize((WIDTH, HEIGHT), Image.LANCZOS)
+
+    px = flowers.load()
+    for x, y, w, h in COVERS + [STATS] + MENU:
+        for yy in range(max(0, y - BORDER), min(HEIGHT, y + h + BORDER)):
+            row = px
+            for xx in range(max(0, x - BORDER), min(WIDTH, x + w + BORDER)):
+                # Lighten toward white rather than erase, so a motif crossing a
+                # panel edge fades out instead of being cut off in a straight line.
+                row[xx, yy] = int(255 - (255 - row[xx, yy]) * fade)
+
+    return ImageChops.darker(boxes, flowers)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("output", help="where to write the PNG (e.g. brand/theme.png)")
     parser.add_argument("--seed", type=int, default=7,
                         help="wobble seed; change for a different hand (default: 7)")
+    parser.add_argument("--flowers", metavar="PNG",
+                        help="flowers-only texture to lay behind the panels; it must "
+                             "contain no boxes of its own")
+    parser.add_argument("--flower-fade", type=float, default=0.12, metavar="F",
+                        help="fraction of flower ink kept inside a panel, where cover "
+                             "art and text are drawn (default: 0.12)")
     args = parser.parse_args()
 
     image = build(args.seed)
+    if args.flowers:
+        image = composite_flowers(image, args.flowers, args.flower_fade)
     image.save(args.output)
 
     # Report the interiors so a reader can check them against the header.
     print(f"{args.output}: {image.width}x{image.height}, border {BORDER}px")
     print(f"  {len(COVERS)} cover panels, 1 stats panel, {len(MENU)} menu rows")
+    if args.flowers:
+        print(f"  flowers from {args.flowers}, {args.flower_fade:.0%} kept inside panels")
 
 
 if __name__ == "__main__":
