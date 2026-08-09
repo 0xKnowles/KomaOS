@@ -352,7 +352,11 @@ class KomaSettings : public PersistableStore<KomaSettings> {
   // Defaults to Disabled so shortcut-based bookmark toggling remains opt-in.
   uint8_t longPressMenuFunction = LP_MENU_DISABLED;
   // UI Theme
-  uint8_t uiTheme = LYRA;
+  // KomaUI, not the inherited Lyra: this is a manga-first firmware and its home
+  // screen should look like one out of the box. Only affects a device with no
+  // settings.json yet -- an existing install keeps whatever it is already set
+  // to, and every other theme is still one entry away under Settings.
+  uint8_t uiTheme = KOMAUI;
   // Sunlight fading compensation
   uint8_t fadingFix = 0;
   // Power button return from footnotes (1 = enabled, 0 = disabled)
